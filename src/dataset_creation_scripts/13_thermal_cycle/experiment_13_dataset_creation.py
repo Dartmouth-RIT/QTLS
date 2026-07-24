@@ -183,7 +183,7 @@ FREQ_STEP_MHZ = 1
 FREQUENCY_LIST_MHZ = np.arange(FREQ_START_MHZ, FREQ_STOP_MHZ, FREQ_STEP_MHZ)  # 3000
 
 ADC_CLOCK_MHZ = 552.96  # digitiser's clock -> 1 sample ~= 1.8084 ns
-N_TIME_SAMPLES = 1000   # how many instants are recorded per ring-down
+N_TIME_SAMPLES = 1000  # how many instants are recorded per ring-down
 N_FREQUENCIES = len(FREQUENCY_LIST_MHZ)  # 3000
 
 # The clock along each recorded trace. The digitiser samples every ~1.8 ns, so
@@ -443,21 +443,25 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     n_cooldowns = len(COOLDOWNS)
     n_total_rows = n_cooldowns * N_FREQUENCIES * N_TIME_SAMPLES  # 6,000,000
 
-    print(f"\nFormat          : long (one row per time sample)")
+    print("\nFormat          : long (one row per time sample)")
     print(f"Sample          : {SAMPLE_NAMES[0]} (sapphire + Shipley 1813)")
     print(f"Cooldowns       : {n_cooldowns}  (1 = before, 2 = after thermal cycle)")
     print(f"Temperature     : ~{TEMPERATURE_MK} mK (nominal; not in the raw files)")
-    print(f"Frequencies     : {N_FREQUENCIES}  ({FREQUENCY_LIST_MHZ[0]}-"
-          f"{FREQUENCY_LIST_MHZ[-1]} MHz, step {FREQ_STEP_MHZ})")
+    print(
+        f"Frequencies     : {N_FREQUENCIES}  ({FREQUENCY_LIST_MHZ[0]}-"
+        f"{FREQUENCY_LIST_MHZ[-1]} MHz, step {FREQ_STEP_MHZ})"
+    )
     print(f"Time samples    : {N_TIME_SAMPLES} per measurement")
-    print(f"Total rows      : {n_cooldowns} x {N_FREQUENCIES} x {N_TIME_SAMPLES} "
-          f"= {n_total_rows:,}")
+    print(
+        f"Total rows      : {n_cooldowns} x {N_FREQUENCIES} x {N_TIME_SAMPLES} "
+        f"= {n_total_rows:,}"
+    )
     print(f"Columns         : {COLUMN_NAMES}")
-    print(f"Note            : single-pulse experiment; pulse width is not recorded\n")
+    print("Note            : single-pulse experiment; pulse width is not recorded\n")
 
     data_all = np.empty((n_total_rows, len(COLUMN_NAMES)), dtype=np.float32)
     row_idx = 0
-    sample_id = SAMPLES[0][1]
+    # sample_id = SAMPLES[0][1]
 
     for cooldown_index, prefix, _desc in tqdm(COOLDOWNS, desc="Cooldowns"):
 
@@ -471,8 +475,10 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
         IQ_matrix = np.load(filepath)  # expect (2, 3000, 1000)
 
         if IQ_matrix.shape != (2, N_FREQUENCIES, N_TIME_SAMPLES):
-            print(f"  WARNING: {filename} has shape {IQ_matrix.shape}, expected "
-                  f"(2, {N_FREQUENCIES}, {N_TIME_SAMPLES}) — skipping")
+            print(
+                f"  WARNING: {filename} has shape {IQ_matrix.shape}, expected "
+                f"(2, {N_FREQUENCIES}, {N_TIME_SAMPLES}) — skipping"
+            )
             continue
 
         I_matrix = IQ_matrix[0]  # (3000, 1000)
@@ -510,33 +516,41 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     with open(cols_path, "w", encoding="utf-8") as fh:
         json.dump(build_column_info(), fh, indent=2)
 
-    print(f"\nDone!")
+    print("\nDone!")
     print(f"  Shape       : ({row_idx:,}, {len(COLUMN_NAMES)})")
-    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path)/1024**2:.1f} MB)")
+    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path) / 1024**2:.1f} MB)")
     print(f"  metadata    : {meta_path}")
     print(f"  column_info : {cols_path}")
 
     # ── Sanity checks ────────────────────────────────────────────────────────
-    print(f"\nRunning sanity checks ...")
+    print("\nRunning sanity checks ...")
     errors = []
 
     if row_idx != n_total_rows:
         errors.append(f"  [FAIL] Row count: got {row_idx:,}, expected {n_total_rows:,}")
     else:
-        print(f"  [PASS] Row count: {row_idx:,} = {n_cooldowns} cooldowns x "
-              f"{N_FREQUENCIES} frequencies x {N_TIME_SAMPLES} samples")
+        print(
+            f"  [PASS] Row count: {row_idx:,} = {n_cooldowns} cooldowns x "
+            f"{N_FREQUENCIES} frequencies x {N_TIME_SAMPLES} samples"
+        )
 
     iq = data_final[:, [COL["I"], COL["Q"]]]
     n_nan = int(np.isnan(iq).sum())
     if n_nan:
         errors.append(f"  [FAIL] I/Q contain {n_nan} NaN values")
     else:
-        print(f"  [PASS] No NaN in I/Q")
+        print("  [PASS] No NaN in I/Q")
 
-    I_min, I_max = float(data_final[:, COL["I"]].min()), float(data_final[:, COL["I"]].max())
-    Q_min, Q_max = float(data_final[:, COL["Q"]].min()), float(data_final[:, COL["Q"]].max())
-    print(f"  [INFO] I range: [{I_min:.1f}, {I_max:.1f}]   "
-          f"Q range: [{Q_min:.1f}, {Q_max:.1f}]")
+    I_min, I_max = float(data_final[:, COL["I"]].min()), float(
+        data_final[:, COL["I"]].max()
+    )
+    Q_min, Q_max = float(data_final[:, COL["Q"]].min()), float(
+        data_final[:, COL["Q"]].max()
+    )
+    print(
+        f"  [INFO] I range: [{I_min:.1f}, {I_max:.1f}]   "
+        f"Q range: [{Q_min:.1f}, {Q_max:.1f}]"
+    )
 
     for col_idx, name, expected in [
         (COL["cooldown_index"], "cooldowns", n_cooldowns),
@@ -555,8 +569,10 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     if n_at == 0:
         errors.append("  [FAIL] frequency_MHz == 3657 matches no rows after upcast")
     else:
-        print(f"  [PASS] frequency_MHz exact under float64 upcast "
-              f"({n_at:,} rows at 3657 MHz)")
+        print(
+            f"  [PASS] frequency_MHz exact under float64 upcast "
+            f"({n_at:,} rows at 3657 MHz)"
+        )
 
     fr = data_final[:, COL["frequency_MHz"]]
     print(f"  [INFO] frequency range: [{fr.min():.0f}, {fr.max():.0f}] MHz")
@@ -565,21 +581,23 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     if not np.array_equal(reloaded["data"], data_final):
         errors.append("  [FAIL] Pickle round-trip: reloaded data differs")
     else:
-        print(f"  [PASS] Pickle round-trip: reloaded array matches exactly")
+        print("  [PASS] Pickle round-trip: reloaded array matches exactly")
 
     if errors:
         print(f"\n  {len(errors)} sanity check(s) FAILED:")
         for e in errors:
             print(e)
     else:
-        print(f"\n  All sanity checks passed.")
+        print("\n  All sanity checks passed.")
 
     # ── CSV ──────────────────────────────────────────────────────────────────
     if write_csv_file:
         print(f"\nWriting CSV to {csv_path} ...")
         write_csv(data_final, COLUMN_NAMES, csv_path)
-        print(f"  CSV         : {csv_path}  "
-              f"({os.path.getsize(csv_path)/1024**2:.1f} MB, {row_idx:,} rows)")
+        print(
+            f"  CSV         : {csv_path}  "
+            f"({os.path.getsize(csv_path) / 1024**2:.1f} MB, {row_idx:,} rows)"
+        )
 
 
 if __name__ == "__main__":

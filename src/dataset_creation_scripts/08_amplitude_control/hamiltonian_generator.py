@@ -10,18 +10,6 @@ Changes in this revision
   where `gap_ns` = time waited *after pulse 1 finishes*.
 • Drive functions use the same envelope as the single-pulse definition.
 """
-"""
-hamiltonian_generator.py
-────────────────────────
-QuTiP helpers for driven N-TLS simulations (Python ≥ 3.9, QuTiP ≥ 5).
-
-Changes in this revision
-────────────────────────
-• `run_simulation_double_pulse` takes
-      pulse1_ns, gap_ns, pulse2_ns            (instead of pulse1_ns, delay_ns, pulse2_ns)
-  where `gap_ns` = time waited *after pulse 1 finishes*.
-• Drive functions use the same envelope as the single-pulse definition.
-"""
 
 import numpy as np
 from qutip import qeye, destroy, tensor, mesolve
@@ -46,8 +34,17 @@ def _tls_ops(N):
 
 
 # ────────────────────────── single pulse ─────────────────────────────
-def run_simulation_single_pulse(freq, amp, tlist, init_freqs, interactions,
-                                gamma, gamma_phi, pulse_ns, T_ramp_ns=1.0):
+def run_simulation_single_pulse(
+    freq,
+    amp,
+    tlist,
+    init_freqs,
+    interactions,
+    gamma,
+    gamma_phi,
+    pulse_ns,
+    T_ramp_ns=1.0,
+):
     """
     freq : ns⁻¹ (treat GHz numerically as ns⁻¹, so no 2π factor here)
     amp  : drive amplitude
@@ -59,6 +56,7 @@ def run_simulation_single_pulse(freq, amp, tlist, init_freqs, interactions,
     H_tls = sum(init_freqs[j] * sz[j] / 2 for j in range(N))
 
     T_ramp = T_ramp_ns
+
     def drive_coeff(t, _=None):
         if t < T_ramp:
             env = 0.5 * (1 - np.cos(np.pi * t / T_ramp))
@@ -85,10 +83,20 @@ def run_simulation_single_pulse(freq, amp, tlist, init_freqs, interactions,
 
 
 # ───────────────────────── two pulses ────────────────────────────────
-def run_simulation_double_pulse(freq, amp1, amp2,
-                                pulse1_ns, gap_ns, pulse2_ns,
-                                tlist, init_freqs, interactions,
-                                gamma, gamma_phi, T_ramp_ns=1.0):
+def run_simulation_double_pulse(
+    freq,
+    amp1,
+    amp2,
+    pulse1_ns,
+    gap_ns,
+    pulse2_ns,
+    tlist,
+    init_freqs,
+    interactions,
+    gamma,
+    gamma_phi,
+    T_ramp_ns=1.0,
+):
     """
     Two pulses at the same frequency.
       • Pulse 1: starts at t=0, duration = pulse1_ns
@@ -100,9 +108,10 @@ def run_simulation_double_pulse(freq, amp1, amp2,
     Sx, Sm = sum(sx), sum(sm)
 
     H_tls = sum(init_freqs[j] * sz[j] / 2 for j in range(N))
-    t_start_p2 = pulse1_ns + gap_ns       # absolute start of pulse 2
+    t_start_p2 = pulse1_ns + gap_ns  # absolute start of pulse 2
 
     T_ramp = T_ramp_ns
+
     def drive_coeff(t, _=None):
         # ------- pulse 1 -------
         if t < T_ramp:
@@ -142,8 +151,9 @@ def run_simulation_double_pulse(freq, amp1, amp2,
 
 
 # ─────────────────── random XX couplings (αy,z optional) ─────────────
-def build_spin_spin_interactions_random_distribution(N, J_min, J_max,
-                                                     alpha_x=1.0, alpha_y=0.0, alpha_z=0.0):
+def build_spin_spin_interactions_random_distribution(
+    N, J_min, J_max, alpha_x=1.0, alpha_y=0.0, alpha_z=0.0
+):
     _, sx, sy, sz = _tls_ops(N)
     J = np.random.uniform(J_min, J_max, size=(N, N))
     J = np.tril(J, -1) + np.tril(J, -1).T
@@ -153,15 +163,24 @@ def build_spin_spin_interactions_random_distribution(N, J_min, J_max,
         for j in range(i + 1, N):
             Jij = J[i, j]
             H_int += Jij * (
-                alpha_x * sx[i] * sx[j] +
-                alpha_y * sy[i] * sy[j] +
-                alpha_z * sz[i] * sz[j]
+                alpha_x * sx[i] * sx[j]
+                + alpha_y * sy[i] * sy[j]
+                + alpha_z * sz[i] * sz[j]
             )
     return H_int
 
 
 # ───────── legacy wrapper (unchanged signature) ─────────
-def run_simulation_for_frequency(freq, tlist, init_freqs, interactions,
-                                 gamma, gamma_phi, drive_ampl, pulse_duration):
-    return run_simulation_single_pulse(freq, drive_ampl, tlist, init_freqs,
-                                       interactions, gamma, gamma_phi, pulse_duration)
+def run_simulation_for_frequency(
+    freq, tlist, init_freqs, interactions, gamma, gamma_phi, drive_ampl, pulse_duration
+):
+    return run_simulation_single_pulse(
+        freq,
+        drive_ampl,
+        tlist,
+        init_freqs,
+        interactions,
+        gamma,
+        gamma_phi,
+        pulse_duration,
+    )

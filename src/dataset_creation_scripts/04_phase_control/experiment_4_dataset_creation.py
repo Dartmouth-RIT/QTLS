@@ -181,7 +181,7 @@ PHASE_LIST_DEG = np.arange(0, 361, 3)  # -> [0, 3, 6, ..., 360]
 PULSE_WIDTH_TICKS = 308
 AWG_CLOCK_MHZ = 9830.4  # pulse generator's clock -> 1 tick   ~= 0.1017 ns
 ADC_CLOCK_MHZ = 552.96  # digitiser's clock       -> 1 sample ~= 1.8084 ns
-N_TIME_SAMPLES = 1000   # how many instants are recorded per ring-down
+N_TIME_SAMPLES = 1000  # how many instants are recorded per ring-down
 
 PULSE_WIDTH_NS = (PULSE_WIDTH_TICKS / AWG_CLOCK_MHZ) * 1000  # ~= 31.33 ns
 
@@ -386,7 +386,10 @@ def build_column_info() -> dict:
     return {
         "dataset": "experiment_4_phase_control",
         "format": "long (one row per time sample)",
-        "n_rows": len(SAMPLES) * len(SPACING_LIST_NS) * len(PHASE_LIST_DEG) * N_TIME_SAMPLES,
+        "n_rows": len(SAMPLES)
+        * len(SPACING_LIST_NS)
+        * len(PHASE_LIST_DEG)
+        * N_TIME_SAMPLES,
         "n_columns": len(COLUMN_NAMES),
         "schema_rule": (
             "The filename holds everything constant within a file (sample, pulse "
@@ -577,10 +580,12 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     n_phases = len(PHASE_LIST_DEG)
     n_total_rows = n_samples * n_spacings * n_phases * N_TIME_SAMPLES  # 2,178,000
 
-    print(f"\nFormat          : long (one row per time sample)")
+    print("\nFormat          : long (one row per time sample)")
     print(f"Samples         : {n_samples}  ({SAMPLE_NAMES})")
     print(f"Spacings        : {n_spacings}  ({SPACING_LIST_NS} ns)")
-    print(f"Phases          : {n_phases}  ({PHASE_LIST_DEG[0]}-{PHASE_LIST_DEG[-1]} deg, step 3)")
+    print(
+        f"Phases          : {n_phases}  ({PHASE_LIST_DEG[0]}-{PHASE_LIST_DEG[-1]} deg, step 3)"
+    )
     print(f"Time samples    : {N_TIME_SAMPLES} per measurement")
     print(
         f"Total rows      : {n_samples} x {n_spacings} x {n_phases} x "
@@ -691,9 +696,9 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     with open(cols_path, "w", encoding="utf-8") as fh:
         json.dump(build_column_info(), fh, indent=2)
 
-    print(f"\nDone!")
+    print("\nDone!")
     print(f"  Shape       : ({row_idx:,}, {len(COLUMN_NAMES)})   — rows x columns")
-    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path)/1024**2:.1f} MB)")
+    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path) / 1024**2:.1f} MB)")
     print(f"  metadata    : {meta_path}")
     print(f"  column_info : {cols_path}")
 
@@ -701,7 +706,7 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     # These do not change the data. They re-derive facts we already expect to be
     # true and shout if any of them is not, so that a silently broken conversion
     # (a missing file, a wrong axis, a rounding trap) cannot pass unnoticed.
-    print(f"\nRunning sanity checks ...")
+    print("\nRunning sanity checks ...")
     errors = []
 
     # Did every file arrive? 18 files x 121 phases x 1000 instants should give
@@ -722,7 +727,7 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     if n_nan > 0 or n_inf > 0:
         errors.append(f"  [FAIL] Data contains {n_nan} NaN and {n_inf} Inf values")
     else:
-        print(f"  [PASS] No NaN or Inf values in dataset")
+        print("  [PASS] No NaN or Inf values in dataset")
 
     # Are the measured numbers the right size? What comes BACK from the chip is
     # a few thousand a.u.; the 30000 number elsewhere in this file is how hard
@@ -764,9 +769,11 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     spacing_64 = data_final[:, COL["spacing_ns"]].astype(np.float64)
     n_at_10 = int((spacing_64 == 10).sum())
     if n_at_10 == 0:
-        errors.append(f"  [FAIL] spacing_ns == 10 matches no rows after float64 upcast")
+        errors.append("  [FAIL] spacing_ns == 10 matches no rows after float64 upcast")
     else:
-        print(f"  [PASS] spacing_ns exact under float64 upcast ({n_at_10:,} rows at 10 ns)")
+        print(
+            f"  [PASS] spacing_ns exact under float64 upcast ({n_at_10:,} rows at 10 ns)"
+        )
 
     ts_col = data_final[:, COL["timestamp_ns"]]
     ts_min, ts_max = float(ts_col.min()), float(ts_col.max())
@@ -783,25 +790,27 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     # memory — i.e. that nothing was lost or corrupted in the writing.
     reloaded = load_pickle(pkl_path)
     if not np.array_equal(reloaded["data"], data_final):
-        errors.append(f"  [FAIL] Pickle round-trip: reloaded data differs from memory")
+        errors.append("  [FAIL] Pickle round-trip: reloaded data differs from memory")
     elif list(reloaded["columns"]) != COLUMN_NAMES:
-        errors.append(f"  [FAIL] Pickle round-trip: columns differ from memory")
+        errors.append("  [FAIL] Pickle round-trip: columns differ from memory")
     else:
-        print(f"  [PASS] Pickle round-trip: reloaded array matches exactly")
+        print("  [PASS] Pickle round-trip: reloaded array matches exactly")
 
     if errors:
         print(f"\n  {len(errors)} sanity check(s) FAILED:")
         for e in errors:
             print(e)
     else:
-        print(f"\n  All sanity checks passed.")
+        print("\n  All sanity checks passed.")
 
     # ── CSV ───────────────────────────────────────────────────────────────────
     if write_csv_file:
         print(f"\nWriting CSV to {csv_path} ...")
         write_csv(data_final, COLUMN_NAMES, csv_path)
-        print(f"  CSV         : {csv_path}  "
-              f"({os.path.getsize(csv_path)/1024**2:.1f} MB, {row_idx:,} rows)")
+        print(
+            f"  CSV         : {csv_path}  "
+            f"({os.path.getsize(csv_path) / 1024**2:.1f} MB, {row_idx:,} rows)"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

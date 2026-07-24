@@ -160,7 +160,6 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
-
 # ONE chip only, which is why there is no sample_id column. Recorded here so the
 # fact is not lost; it also goes into metadata.json.
 SAMPLE_NAME = "Si_111_native_oxide"
@@ -178,7 +177,7 @@ FREQUENCY_LIST_MHZ = np.arange(4100, 4600, 1)  # 500 values
 
 AWG_CLOCK_MHZ = 9830.4  # pulse generator's clock -> 1 tick   ~= 0.1017 ns
 ADC_CLOCK_MHZ = 552.96  # digitiser's clock       -> 1 sample ~= 1.8084 ns
-N_TIME_SAMPLES = 1000   # how many instants are recorded per ring-down
+N_TIME_SAMPLES = 1000  # how many instants are recorded per ring-down
 
 N_PULSE_WIDTHS = len(PULSE_WIDTH_TICKS_LIST)  # 42
 N_FREQUENCIES = len(FREQUENCY_LIST_MHZ)  # 500
@@ -477,19 +476,27 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
 
     n_total_rows = N_PULSE_WIDTHS * N_FREQUENCIES * N_TIME_SAMPLES  # 21,000,000
 
-    print(f"\nFormat          : long (one row per time sample)")
+    print("\nFormat          : long (one row per time sample)")
     print(f"Sample          : {SAMPLE_NAME} ({SAMPLE_MATERIAL})")
-    print(f"Pulse widths    : {N_PULSE_WIDTHS}  ({PULSE_WIDTHS_NS[0]:.3f}-"
-          f"{PULSE_WIDTHS_NS[-1]:.3f} ns, from {PULSE_WIDTH_TICKS_LIST[0]}-"
-          f"{PULSE_WIDTH_TICKS_LIST[-1]} ticks)")
-    print(f"Frequencies     : {N_FREQUENCIES}  ({FREQUENCY_LIST_MHZ[0]}-"
-          f"{FREQUENCY_LIST_MHZ[-1]} MHz, step 1)")
+    print(
+        f"Pulse widths    : {N_PULSE_WIDTHS}  ({PULSE_WIDTHS_NS[0]:.3f}-"
+        f"{PULSE_WIDTHS_NS[-1]:.3f} ns, from {PULSE_WIDTH_TICKS_LIST[0]}-"
+        f"{PULSE_WIDTH_TICKS_LIST[-1]} ticks)"
+    )
+    print(
+        f"Frequencies     : {N_FREQUENCIES}  ({FREQUENCY_LIST_MHZ[0]}-"
+        f"{FREQUENCY_LIST_MHZ[-1]} MHz, step 1)"
+    )
     print(f"Time samples    : {N_TIME_SAMPLES} per measurement")
-    print(f"Total rows      : {N_PULSE_WIDTHS} x {N_FREQUENCIES} x "
-          f"{N_TIME_SAMPLES} = {n_total_rows:,}")
+    print(
+        f"Total rows      : {N_PULSE_WIDTHS} x {N_FREQUENCIES} x "
+        f"{N_TIME_SAMPLES} = {n_total_rows:,}"
+    )
     print(f"Columns         : {COLUMN_NAMES}")
-    print(f"Memory needed   : ~{n_total_rows*len(COLUMN_NAMES)*4/1024**3:.2f} GB "
-          f"for the array alone\n")
+    print(
+        f"Memory needed   : ~{n_total_rows * len(COLUMN_NAMES) * 4 / 1024**3:.2f} GB "
+        f"for the array alone\n"
+    )
 
     # Make the whole output table up front and fill it in, rather than growing it
     # row by row (which would be far slower). float32 = 4 bytes per number, so
@@ -522,8 +529,10 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
         # truncated acquisition, or one of the DERIVED products that sit in the
         # same directory as the raw sweeps.
         if IQ_matrix.shape != (2, N_FREQUENCIES, N_TIME_SAMPLES):
-            print(f"  WARNING: {filename} has shape {IQ_matrix.shape}, expected "
-                  f"(2, {N_FREQUENCIES}, {N_TIME_SAMPLES}) — skipping")
+            print(
+                f"  WARNING: {filename} has shape {IQ_matrix.shape}, expected "
+                f"(2, {N_FREQUENCIES}, {N_TIME_SAMPLES}) — skipping"
+            )
             continue
 
         I_matrix = IQ_matrix[0]  # shape (500, 1000) — I for every frequency
@@ -575,9 +584,9 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     with open(cols_path, "w", encoding="utf-8") as fh:
         json.dump(build_column_info(), fh, indent=2)
 
-    print(f"\nDone!")
+    print("\nDone!")
     print(f"  Shape       : ({row_idx:,}, {len(COLUMN_NAMES)})   — rows x columns")
-    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path)/1024**2:.1f} MB)")
+    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path) / 1024**2:.1f} MB)")
     print(f"  metadata    : {meta_path}")
     print(f"  column_info : {cols_path}")
 
@@ -585,7 +594,7 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     # These do not change the data. They re-derive facts we already expect to be
     # true and shout if any of them is not, so that a silently broken conversion
     # (a missing file, a wrong axis, a rounding trap) cannot pass unnoticed.
-    print(f"\nRunning sanity checks ...")
+    print("\nRunning sanity checks ...")
     errors = []
 
     # Did every file arrive? 42 files x 500 frequencies x 1000 instants should
@@ -596,15 +605,17 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
             f"— likely caused by missing .npy files"
         )
     else:
-        print(f"  [PASS] Row count: {row_idx:,} = {N_PULSE_WIDTHS} pulse widths x "
-              f"{N_FREQUENCIES} frequencies x {N_TIME_SAMPLES} samples")
+        print(
+            f"  [PASS] Row count: {row_idx:,} = {N_PULSE_WIDTHS} pulse widths x "
+            f"{N_FREQUENCIES} frequencies x {N_TIME_SAMPLES} samples"
+        )
 
     n_nan = int(np.sum(np.isnan(data_final)))
     n_inf = int(np.sum(np.isinf(data_final)))
     if n_nan > 0 or n_inf > 0:
         errors.append(f"  [FAIL] Data contains {n_nan} NaN and {n_inf} Inf values")
     else:
-        print(f"  [PASS] No NaN or Inf values in dataset")
+        print("  [PASS] No NaN or Inf values in dataset")
 
     # Are the measured numbers the right size? What comes BACK from the chip is a
     # few thousand a.u.; the 30000 number is how hard we SHOUT, not what we hear.
@@ -620,8 +631,10 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
             f"I=[{I_min:.0f}, {I_max:.0f}], Q=[{Q_min:.0f}, {Q_max:.0f}]"
         )
     else:
-        print(f"  [PASS] I/Q readout range: I=[{I_min:.1f}, {I_max:.1f}], "
-              f"Q=[{Q_min:.1f}, {Q_max:.1f}]")
+        print(
+            f"  [PASS] I/Q readout range: I=[{I_min:.1f}, {I_max:.1f}], "
+            f"Q=[{Q_min:.1f}, {Q_max:.1f}]"
+        )
 
     for col_idx, name, expected in [
         (0, "pulse widths", N_PULSE_WIDTHS),
@@ -642,8 +655,10 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     if n_at == 0:
         errors.append("  [FAIL] frequency_MHz == 4254 matches no rows after upcast")
     else:
-        print(f"  [PASS] frequency_MHz exact under float64 upcast "
-              f"({n_at:,} rows at 4254 MHz)")
+        print(
+            f"  [PASS] frequency_MHz exact under float64 upcast "
+            f"({n_at:,} rows at 4254 MHz)"
+        )
 
     ts_col = data_final[:, 2]
     ts_min, ts_max = float(ts_col.min()), float(ts_col.max())
@@ -663,26 +678,30 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     cols_ok = list(reloaded["columns"]) == COLUMN_NAMES
     del reloaded
     if not same:
-        errors.append(f"  [FAIL] Pickle round-trip: reloaded data differs from memory")
+        errors.append("  [FAIL] Pickle round-trip: reloaded data differs from memory")
     elif not cols_ok:
-        errors.append(f"  [FAIL] Pickle round-trip: columns differ from memory")
+        errors.append("  [FAIL] Pickle round-trip: columns differ from memory")
     else:
-        print(f"  [PASS] Pickle round-trip: reloaded array matches exactly")
+        print("  [PASS] Pickle round-trip: reloaded array matches exactly")
 
     if errors:
         print(f"\n  {len(errors)} sanity check(s) FAILED:")
         for e in errors:
             print(e)
     else:
-        print(f"\n  All sanity checks passed.")
+        print("\n  All sanity checks passed.")
 
     # ── CSV ───────────────────────────────────────────────────────────────────
     if write_csv_file:
         print(f"\nWriting CSV to {csv_path} ...")
-        print(f"  (expect roughly {n_total_rows*55/1024**3:.1f} GB and a few minutes)")
+        print(
+            f"  (expect roughly {n_total_rows * 55 / 1024**3:.1f} GB and a few minutes)"
+        )
         write_csv(data_final, COLUMN_NAMES, csv_path)
-        print(f"  CSV         : {csv_path}  "
-              f"({os.path.getsize(csv_path)/1024**2:.1f} MB, {row_idx:,} rows)")
+        print(
+            f"  CSV         : {csv_path}  "
+            f"({os.path.getsize(csv_path) / 1024**2:.1f} MB, {row_idx:,} rows)"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

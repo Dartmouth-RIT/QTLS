@@ -144,7 +144,6 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
-
 SAMPLES = [("FM_Shipley", 0)]
 SAMPLE_MATERIAL = {
     "FM_Shipley": "Sapphire substrate with spin-coated Shipley 1813 photoresist"
@@ -173,7 +172,7 @@ EXPECTED_FREQ_MHZ = np.arange(FREQ_START_MHZ, FREQ_STOP_MHZ + 1, FREQ_STEP_MHZ) 
 PULSE_WIDTH_TICKS = 308
 AWG_CLOCK_MHZ = 9830.4  # pulse generator's clock -> 1 tick   ~= 0.1017 ns
 ADC_CLOCK_MHZ = 552.96  # digitiser's clock       -> 1 sample ~= 1.8084 ns
-N_TIME_SAMPLES = 1000   # how many instants are recorded per ring-down
+N_TIME_SAMPLES = 1000  # how many instants are recorded per ring-down
 N_FREQUENCIES = len(EXPECTED_FREQ_MHZ)  # 401
 
 PULSE_WIDTH_NS = (PULSE_WIDTH_TICKS / AWG_CLOCK_MHZ) * 1000  # ~= 31.33 ns
@@ -566,19 +565,26 @@ def build_dataset(
     n_reps = len(reps)
     n_total_rows = n_reps * N_FREQUENCIES * N_TIME_SAMPLES
 
-    print(f"\nFormat          : long (one row per time sample)")
+    print("\nFormat          : long (one row per time sample)")
     print(f"Sample          : {SAMPLE_NAMES[0]} (sapphire + Shipley 1813)")
     print(f"Reps found      : {n_reps}  ({min(reps)}-{max(reps)})")
-    print(f"Frequencies     : {N_FREQUENCIES}  ({FREQ_START_MHZ}-{FREQ_STOP_MHZ} MHz, "
-          f"step {FREQ_STEP_MHZ})")
+    print(
+        f"Frequencies     : {N_FREQUENCIES}  ({FREQ_START_MHZ}-{FREQ_STOP_MHZ} MHz, "
+        f"step {FREQ_STEP_MHZ})"
+    )
     print(f"Time samples    : {N_TIME_SAMPLES} per measurement")
-    print(f"Total rows      : {n_reps} x {N_FREQUENCIES} x {N_TIME_SAMPLES} "
-          f"= {n_total_rows:,}")
+    print(
+        f"Total rows      : {n_reps} x {N_FREQUENCIES} x {N_TIME_SAMPLES} "
+        f"= {n_total_rows:,}"
+    )
     print(f"Columns         : {COLUMN_NAMES}")
-    print(f"Memory needed   : ~{n_total_rows*len(COLUMN_NAMES)*4/1024**3:.2f} GB "
-          f"for the array alone")
-    print(f"Note            : single-pulse experiment; T_mxc_K may legitimately "
-          f"be NaN\n")
+    print(
+        f"Memory needed   : ~{n_total_rows * len(COLUMN_NAMES) * 4 / 1024**3:.2f} GB "
+        f"for the array alone"
+    )
+    print(
+        "Note            : single-pulse experiment; T_mxc_K may legitimately be NaN\n"
+    )
 
     # ── Pass 1: find the run start, so elapsed_s is relative to it ───────────
     run_start = None
@@ -594,7 +600,7 @@ def build_dataset(
     # ── Pass 2: build ────────────────────────────────────────────────────────
     data_all = np.empty((n_total_rows, len(COLUMN_NAMES)), dtype=np.float32)
     row_idx = 0
-    sample_id = SAMPLES[0][1]
+    # sample_id = SAMPLES[0][1]
     n_files = 0
 
     for rep in tqdm(reps, desc="Reps"):
@@ -623,14 +629,18 @@ def build_dataset(
             T_mxc = z["T_mxc"]
 
         if IQ_matrix.shape != (2, N_FREQUENCIES, N_TIME_SAMPLES):
-            print(f"  WARNING: {filename} has shape {IQ_matrix.shape}, expected "
-                  f"(2, {N_FREQUENCIES}, {N_TIME_SAMPLES}) — skipping")
+            print(
+                f"  WARNING: {filename} has shape {IQ_matrix.shape}, expected "
+                f"(2, {N_FREQUENCIES}, {N_TIME_SAMPLES}) — skipping"
+            )
             continue
 
         # The frequency axis is in the file; verify rather than assume.
         if not np.array_equal(freq_array, EXPECTED_FREQ_MHZ):
-            print(f"  WARNING: {filename} pulse_freq_array does not match "
-                  f"np.arange(3000, 5001, 5) — using the file's own axis")
+            print(
+                f"  WARNING: {filename} pulse_freq_array does not match "
+                f"np.arange(3000, 5001, 5) — using the file's own axis"
+            )
 
         elapsed = (time_stamps - run_start).astype("timedelta64[s]").astype(np.float64)
 
@@ -677,28 +687,30 @@ def build_dataset(
     with open(cols_path, "w", encoding="utf-8") as fh:
         json.dump(build_column_info(reps), fh, indent=2)
 
-    print(f"\nDone!")
+    print("\nDone!")
     print(f"  Shape       : ({row_idx:,}, {len(COLUMN_NAMES)})")
-    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path)/1024**2:.1f} MB)")
+    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path) / 1024**2:.1f} MB)")
     print(f"  metadata    : {meta_path}")
     print(f"  column_info : {cols_path}")
 
     # ── Sanity checks ────────────────────────────────────────────────────────
-    print(f"\nRunning sanity checks ...")
+    print("\nRunning sanity checks ...")
     errors = []
 
     if row_idx != n_total_rows:
         errors.append(f"  [FAIL] Row count: got {row_idx:,}, expected {n_total_rows:,}")
     else:
-        print(f"  [PASS] Row count: {row_idx:,} = {n_reps} reps x {N_FREQUENCIES} "
-              f"frequencies x {N_TIME_SAMPLES} samples")
+        print(
+            f"  [PASS] Row count: {row_idx:,} = {n_reps} reps x {N_FREQUENCIES} "
+            f"frequencies x {N_TIME_SAMPLES} samples"
+        )
 
     # I and Q must NEVER be NaN, even though the thermometry may be.
     n_nan_iq = int(np.isnan(data_final[:, [COL["I"], COL["Q"]]]).sum())
     if n_nan_iq:
         errors.append(f"  [FAIL] I/Q contain {n_nan_iq} NaN values")
     else:
-        print(f"  [PASS] No NaN in I/Q")
+        print("  [PASS] No NaN in I/Q")
 
     # NaN in T_mxc_K is expected: the thermometer drops out as the fridge warms.
     # Report where, rather than treating it as an error.
@@ -706,15 +718,23 @@ def build_dataset(
     rep_col = data_final[:, COL["rep_index"]]
     n_nan_t = int(np.isnan(t_mxc).sum())
     nan_reps = np.unique(rep_col[np.isnan(t_mxc)]).astype(int).tolist()
-    print(f"  [INFO] T_mxc_K NaN: {n_nan_t:,} rows "
-          f"({n_nan_t/len(data_final)*100:.1f}%), in reps "
-          f"{min(nan_reps) if nan_reps else '-'}-"
-          f"{max(nan_reps) if nan_reps else '-'}")
+    print(
+        f"  [INFO] T_mxc_K NaN: {n_nan_t:,} rows "
+        f"({n_nan_t / len(data_final) * 100:.1f}%), in reps "
+        f"{min(nan_reps) if nan_reps else '-'}-"
+        f"{max(nan_reps) if nan_reps else '-'}"
+    )
 
-    I_min, I_max = float(data_final[:, COL["I"]].min()), float(data_final[:, COL["I"]].max())
-    Q_min, Q_max = float(data_final[:, COL["Q"]].min()), float(data_final[:, COL["Q"]].max())
-    print(f"  [INFO] I range: [{I_min:.1f}, {I_max:.1f}]   "
-          f"Q range: [{Q_min:.1f}, {Q_max:.1f}]")
+    I_min, I_max = float(data_final[:, COL["I"]].min()), float(
+        data_final[:, COL["I"]].max()
+    )
+    Q_min, Q_max = float(data_final[:, COL["Q"]].min()), float(
+        data_final[:, COL["Q"]].max()
+    )
+    print(
+        f"  [INFO] I range: [{I_min:.1f}, {I_max:.1f}]   "
+        f"Q range: [{Q_min:.1f}, {Q_max:.1f}]"
+    )
 
     for col_idx, name, expected in [
         (COL["rep_index"], "reps", n_reps),
@@ -732,12 +752,16 @@ def build_dataset(
     if n_at == 0:
         errors.append("  [FAIL] frequency_MHz == 3400 matches no rows after upcast")
     else:
-        print(f"  [PASS] frequency_MHz exact under float64 upcast "
-              f"({n_at:,} rows at 3400 MHz)")
+        print(
+            f"  [PASS] frequency_MHz exact under float64 upcast "
+            f"({n_at:,} rows at 3400 MHz)"
+        )
 
     el = data_final[:, COL["elapsed_s"]]
-    print(f"  [INFO] elapsed_s range: [{el.min():.0f}, {el.max():.0f}] s "
-          f"({(el.max()-el.min())/3600:.1f} h warm-up)")
+    print(
+        f"  [INFO] elapsed_s range: [{el.min():.0f}, {el.max():.0f}] s "
+        f"({(el.max() - el.min()) / 3600:.1f} h warm-up)"
+    )
     tm = t_mxc[~np.isnan(t_mxc)]
     print(f"  [INFO] T_mxc_K range: [{tm.min():.4f}, {tm.max():.2f}] K")
 
@@ -748,24 +772,27 @@ def build_dataset(
     if not same:
         errors.append("  [FAIL] Pickle round-trip: reloaded data differs")
     else:
-        print(f"  [PASS] Pickle round-trip: reloaded array matches exactly "
-              f"(NaN-aware)")
+        print("  [PASS] Pickle round-trip: reloaded array matches exactly (NaN-aware)")
 
     if errors:
         print(f"\n  {len(errors)} sanity check(s) FAILED:")
         for e in errors:
             print(e)
     else:
-        print(f"\n  All sanity checks passed.")
+        print("\n  All sanity checks passed.")
 
     # ── CSV ──────────────────────────────────────────────────────────────────
     if write_csv_file:
         print(f"\nWriting CSV to {csv_path} ...")
-        print(f"  (expect roughly {n_total_rows*85/1024**3:.1f} GB and several "
-              f"minutes)")
+        print(
+            f"  (expect roughly {n_total_rows * 85 / 1024**3:.1f} GB and several "
+            f"minutes)"
+        )
         write_csv(data_final, COLUMN_NAMES, csv_path)
-        print(f"  CSV         : {csv_path}  "
-              f"({os.path.getsize(csv_path)/1024**2:.1f} MB, {row_idx:,} rows)")
+        print(
+            f"  CSV         : {csv_path}  "
+            f"({os.path.getsize(csv_path) / 1024**2:.1f} MB, {row_idx:,} rows)"
+        )
 
 
 if __name__ == "__main__":

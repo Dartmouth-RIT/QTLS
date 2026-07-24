@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Build the QTLS dataset portal: reads every experiment README and embeds it
 so each experiment card opens its own documentation in a reader panel."""
+
 import re, json, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE = os.path.join(HERE, "..", "src", "dataset_creation_scripts")
-OUT  = os.path.join(HERE, "index.html")
+OUT = os.path.join(HERE, "index.html")
 
-SIMS = {6, 7, 8, 9, 10, 15, 16}   # simulation experiments; the rest are measured
+SIMS = {6, 7, 8, 9, 10, 15, 16}  # simulation experiments; the rest are measured
 
-folders = sorted(d for d in os.listdir(BASE)
-                 if re.match(r"^\d\d_", d) and os.path.isdir(os.path.join(BASE, d)))
+folders = sorted(
+    d
+    for d in os.listdir(BASE)
+    if re.match(r"^\d\d_", d) and os.path.isdir(os.path.join(BASE, d))
+)
 
 experiments = []
 for folder in folders:
@@ -55,32 +59,37 @@ for folder in folders:
     if len(desc) > 185:
         desc = desc[:185].rsplit(" ", 1)[0] + "…"
 
-    experiments.append({
-        "num": f"{num:02d}",
-        "title": title,
-        "desc": desc,
-        "badge": "sim" if num in SIMS else "meas",
-        "md": md,
-    })
+    experiments.append(
+        {
+            "num": f"{num:02d}",
+            "title": title,
+            "desc": desc,
+            "badge": "sim" if num in SIMS else "meas",
+            "md": md,
+        }
+    )
 
-readmes = {e["num"]: {"title": e["title"], "badge": e["badge"], "md": e["md"]}
-           for e in experiments}
+readmes = {
+    e["num"]: {"title": e["title"], "badge": e["badge"], "md": e["md"]}
+    for e in experiments
+}
 
 # experiment cards
 cards = []
 for e in experiments:
     label = "Simulated" if e["badge"] == "sim" else "Measured"
     cards.append(
-        f'''<button class="card exp-card reveal" data-exp="{e['num']}" aria-label="Open documentation for experiment {e['num']}">
+        f"""<button class="card exp-card reveal" data-exp="{e['num']}" aria-label="Open documentation for experiment {e['num']}">
         <div class="exp-top"><span class="exp-id">EXP · {e['num']}</span><span class="badge {e['badge']}">{label}</span></div>
         <h3>{e['title']}</h3>
         <p>{e['desc']}</p>
         <span class="read-link">Read documentation <span class="arrow">→</span></span>
-      </button>''')
+      </button>"""
+    )
 cards_html = "\n".join(cards)
 
 n_meas = sum(1 for e in experiments if e["badge"] == "meas")
-n_sim  = sum(1 for e in experiments if e["badge"] == "sim")
+n_sim = sum(1 for e in experiments if e["badge"] == "sim")
 
 TEMPLATE = r"""<!doctype html>
 <html lang="en">
@@ -514,12 +523,13 @@ df = pd.<span class="c-fn">DataFrame</span>(payload[<span class="c-str">"data"</
 </html>
 """
 
-html = (TEMPLATE
-        .replace("__CARDS__", cards_html)
-        .replace("__READMES__", json.dumps(readmes))
-        .replace("__NEXP__", str(len(experiments)))
-        .replace("__NMEAS__", str(n_meas))
-        .replace("__NSIM__", str(n_sim)))
+html = (
+    TEMPLATE.replace("__CARDS__", cards_html)
+    .replace("__READMES__", json.dumps(readmes))
+    .replace("__NEXP__", str(len(experiments)))
+    .replace("__NMEAS__", str(n_meas))
+    .replace("__NSIM__", str(n_sim))
+)
 
 open(OUT, "w", encoding="utf-8").write(html)
 print("wrote", OUT, "-", len(experiments), "experiments,", len(html), "bytes")

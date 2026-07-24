@@ -168,32 +168,32 @@ from tqdm import tqdm
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Pulse timing (nanoseconds).
-PULSE_RING = 200              # single pulse used in the ring-down map (panel 0)
-PULSE1_NS  = PULSE_RING       # pulse-1 duration (panels 1, 2)
-GAP_NS     = 100              # idle gap AFTER pulse 1 ends (panel 2)
-PULSE2_NS  = 200              # pulse-2 duration (panel 2)
+PULSE_RING = 200  # single pulse used in the ring-down map (panel 0)
+PULSE1_NS = PULSE_RING  # pulse-1 duration (panels 1, 2)
+GAP_NS = 100  # idle gap AFTER pulse 1 ends (panel 2)
+PULSE2_NS = 200  # pulse-2 duration (panel 2)
 
 # Drive-frequency sweep (panel 0). Treated numerically as GHz == ns^-1.
 F_MIN, F_MAX = 3.0, 5.0
-N_FREQ       = 400
+N_FREQ = 400
 
 # Time grid: 0 to 1600 ns, 1000 points.
 T_MAX_NS, N_T = 1600, 1000
 
 # The N = 4 coupled-TLS ensemble. The seed fixes both the TLS frequencies and
 # the coupling matrix; the draw ORDER below fixes the ensemble deterministically.
-N_TLS        = 4
-SEED         = 2072025
-J_MIN, J_MAX = -0.05, 0.05    # XX coupling range (J in [-0.05, 0.05] GHz)
+N_TLS = 4
+SEED = 2072025
+J_MIN, J_MAX = -0.05, 0.05  # XX coupling range (J in [-0.05, 0.05] GHz)
 
 # Dissipation: collective decay GAMMA, pure dephasing GAMMA_PHI (off here).
 GAMMA, GAMMA_PHI = 0.002, 0.0
 
 # Drive amplitudes (dimensionless).
-AMP_BASE   = 0.10             # fixed amplitude for the ring-down map (panel 0)
-AMP1_FIXED = 0.10             # fixed pulse-1 amplitude for the two-pulse sweep (panel 2)
-N_AMP      = 60
-AMP_LO, AMP_HI = 0.0, 0.10    # A1 sweep (panel 1) and A2 sweep (panel 2)
+AMP_BASE = 0.10  # fixed amplitude for the ring-down map (panel 0)
+AMP1_FIXED = 0.10  # fixed pulse-1 amplitude for the two-pulse sweep (panel 2)
+N_AMP = 60
+AMP_LO, AMP_HI = 0.0, 0.10  # A1 sweep (panel 1) and A2 sweep (panel 2)
 
 # Panel bookkeeping.
 PANEL_NAMES = ["ring_down_map", "amp_sweep", "two_pulse_sweep"]
@@ -222,6 +222,7 @@ PICKLE_PROTOCOL = 4
 # ENSEMBLE SETUP — the exact RNG stream that fixes the ensemble
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def build_ensemble(smoke_test=False):
     """Return (init_freqs, H_int).
 
@@ -245,6 +246,7 @@ def build_ensemble(smoke_test=False):
         return init_freqs, J
 
     from hamiltonian_generator import build_spin_spin_interactions_random_distribution
+
     H_int = build_spin_spin_interactions_random_distribution(
         N_TLS, J_MIN, J_MAX, alpha_x=1.0, alpha_y=0.0, alpha_z=0.0
     )
@@ -257,7 +259,7 @@ def coupling_matrix_from_seed():
     rng_state = np.random.get_state()
     try:
         np.random.seed(SEED)
-        _ = np.random.uniform(F_MIN, F_MAX, N_TLS)          # consume init_freqs draw
+        _ = np.random.uniform(F_MIN, F_MAX, N_TLS)  # consume init_freqs draw
         J = np.random.uniform(J_MIN, J_MAX, size=(N_TLS, N_TLS))
         J = np.tril(J, -1) + np.tril(J, -1).T
     finally:
@@ -271,29 +273,33 @@ def coupling_matrix_from_seed():
 # a machine without qutip. The real run never touches these functions.
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _synthetic_single(freq, amp, tlist, init_freqs, pulse_ns):
     """Cheap analytic surrogate for run_simulation_single_pulse (smoke test)."""
     detune = np.min(np.abs(np.asarray(init_freqs) - freq))
-    lorentz = 1.0 / (1.0 + (detune / 0.15) ** 2)           # near-resonance envelope
-    drive = amp * lorentz * np.sin(
-        np.pi * np.clip(tlist / max(pulse_ns, 1e-9), 0, 1)
-    ) ** 2
-    tail = np.where(tlist > pulse_ns,
-                    amp * lorentz * np.exp(-GAMMA * (tlist - pulse_ns)), 0.0)
+    lorentz = 1.0 / (1.0 + (detune / 0.15) ** 2)  # near-resonance envelope
+    drive = (
+        amp * lorentz * np.sin(np.pi * np.clip(tlist / max(pulse_ns, 1e-9), 0, 1)) ** 2
+    )
+    tail = np.where(
+        tlist > pulse_ns, amp * lorentz * np.exp(-GAMMA * (tlist - pulse_ns)), 0.0
+    )
     pop = np.where(tlist <= pulse_ns, drive, tail)
     return np.clip(pop, 0.0, None).astype(np.float64)
 
 
-def _synthetic_double(freq, amp1, amp2, pulse1_ns, gap_ns, pulse2_ns,
-                      tlist, init_freqs):
+def _synthetic_double(
+    freq, amp1, amp2, pulse1_ns, gap_ns, pulse2_ns, tlist, init_freqs
+):
     """Cheap analytic surrogate for run_simulation_double_pulse (smoke test)."""
     p1 = _synthetic_single(freq, amp1, tlist, init_freqs, pulse1_ns)
     t2_start = pulse1_ns + gap_ns
     shifted = tlist - t2_start
-    p2 = np.where(shifted >= 0,
-                  _synthetic_single(freq, amp2, np.clip(shifted, 0, None),
-                                    init_freqs, pulse2_ns),
-                  0.0)
+    p2 = np.where(
+        shifted >= 0,
+        _synthetic_single(freq, amp2, np.clip(shifted, 0, None), init_freqs, pulse2_ns),
+        0.0,
+    )
     return np.clip(p1 * np.exp(-GAMMA * tlist) + p2, 0.0, None).astype(np.float64)
 
 
@@ -301,8 +307,10 @@ def _synthetic_double(freq, amp1, amp2, pulse1_ns, gap_ns, pulse2_ns,
 # SWEEP RUNNERS — thin wrappers around the ORIGINAL physics functions
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _run_sweep(kind, param_list, freq_star, tlist, init_freqs, H_int,
-               workers, smoke_test):
+
+def _run_sweep(
+    kind, param_list, freq_star, tlist, init_freqs, H_int, workers, smoke_test
+):
     """Run one panel's sweep, returning a (len(param_list), len(tlist)) array.
 
     kind = "freq"   -> single-pulse ring-down map, param_list = drive freqs
@@ -323,27 +331,64 @@ def _run_sweep(kind, param_list, freq_star, tlist, init_freqs, H_int,
             elif kind == "amp1":
                 out[i] = _synthetic_single(freq_star, p, tlist, init_freqs, PULSE1_NS)
             else:  # amp2
-                out[i] = _synthetic_double(freq_star, AMP1_FIXED, p,
-                                           PULSE1_NS, GAP_NS, PULSE2_NS,
-                                           tlist, init_freqs)
+                out[i] = _synthetic_double(
+                    freq_star,
+                    AMP1_FIXED,
+                    p,
+                    PULSE1_NS,
+                    GAP_NS,
+                    PULSE2_NS,
+                    tlist,
+                    init_freqs,
+                )
         return out
 
     # ── real physics: parallel qutip solver ──────────────────────────────────
     from concurrent.futures import ProcessPoolExecutor, as_completed
     from hamiltonian_generator import (
-        run_simulation_single_pulse, run_simulation_double_pulse,
+        run_simulation_single_pulse,
+        run_simulation_double_pulse,
     )
 
     def submit(pool, p):
         if kind == "freq":
-            return pool.submit(run_simulation_single_pulse, p, AMP_BASE,
-                               tlist, init_freqs, H_int, GAMMA, GAMMA_PHI, PULSE1_NS)
+            return pool.submit(
+                run_simulation_single_pulse,
+                p,
+                AMP_BASE,
+                tlist,
+                init_freqs,
+                H_int,
+                GAMMA,
+                GAMMA_PHI,
+                PULSE1_NS,
+            )
         if kind == "amp1":
-            return pool.submit(run_simulation_single_pulse, freq_star, p,
-                               tlist, init_freqs, H_int, GAMMA, GAMMA_PHI, PULSE1_NS)
-        return pool.submit(run_simulation_double_pulse, freq_star, AMP1_FIXED, p,
-                           PULSE1_NS, GAP_NS, PULSE2_NS,
-                           tlist, init_freqs, H_int, GAMMA, GAMMA_PHI)
+            return pool.submit(
+                run_simulation_single_pulse,
+                freq_star,
+                p,
+                tlist,
+                init_freqs,
+                H_int,
+                GAMMA,
+                GAMMA_PHI,
+                PULSE1_NS,
+            )
+        return pool.submit(
+            run_simulation_double_pulse,
+            freq_star,
+            AMP1_FIXED,
+            p,
+            PULSE1_NS,
+            GAP_NS,
+            PULSE2_NS,
+            tlist,
+            init_freqs,
+            H_int,
+            GAMMA,
+            GAMMA_PHI,
+        )
 
     n_workers = max(1, min(workers, len(param_list)))
     with ProcessPoolExecutor(n_workers) as pool:
@@ -357,8 +402,8 @@ def _run_sweep(kind, param_list, freq_star, tlist, init_freqs, H_int,
 # METADATA
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_metadata(freq_star, init_freqs, n_freq, n_amp, n_t,
-                   smoke_test=False) -> dict:
+
+def build_metadata(freq_star, init_freqs, n_freq, n_amp, n_t, smoke_test=False) -> dict:
     """Instance metadata: the schema header, the resolved runtime values (actual
     TLS frequencies, FREQ_STAR, coupling matrix), and provenance. The full
     data-feature schema (grouped rows + colour legend) lives in
@@ -420,7 +465,7 @@ def build_metadata(freq_star, init_freqs, n_freq, n_amp, n_t,
         "provenance": {
             "physics_module": "hamiltonian_generator.py (QuTiP-5 API shim only)",
             "attribution": "Uses code and simulation methods from the "
-                           "Fitzpatrick Lab, Dartmouth College.",
+            "Fitzpatrick Lab, Dartmouth College.",
             "panel_c_note": "Panel c sweeps A2 (second pulse) with A1 fixed.",
             "no_new_physics": True,
             "smoke_test": smoke_test,
@@ -461,71 +506,138 @@ def build_column_info(n_freq, n_amp, n_t) -> dict:
             {
                 "section": "OVERVIEW",
                 "rows": [
-                    row("what_it_shows", "Text", "-", "experiment_8_dataset_creation.py",
-                        "Amplitude and multi-pulse control of a 4-TLS ensemble", "No",
+                    row(
+                        "what_it_shows",
+                        "Text",
+                        "-",
+                        "experiment_8_dataset_creation.py",
+                        "Amplitude and multi-pulse control of a 4-TLS ensemble",
+                        "No",
                         "a: ring-down map (single pulse); b: amplitude sweep at the "
                         "optimal drive frequency (collapse-and-revival); c: two-pulse "
-                        "protocol (A2 swept, A1 fixed, gap 100 ns).", "green"),
+                        "protocol (A2 swept, A1 fixed, gap 100 ns).",
+                        "green",
+                    ),
                 ],
             },
             {
                 "section": "PHYSICAL SYSTEM METADATA - the simulated TLS ensemble",
                 "rows": [
-                    row("system", "String", "No", "N_TLS",
-                        "N = 4 coupled TLS, Lindblad master equation", "No",
-                        "Ensemble size.", "green"),
-                    row("TLS_frequencies", "Float", "No", "init_freqs",
+                    row(
+                        "system",
+                        "String",
+                        "No",
+                        "N_TLS",
+                        "N = 4 coupled TLS, Lindblad master equation",
+                        "No",
+                        "Ensemble size.",
+                        "green",
+                    ),
+                    row(
+                        "TLS_frequencies",
+                        "Float",
+                        "No",
+                        "init_freqs",
                         "uniform[3.0, 5.0] GHz, seed 2072025 -> "
-                        "{3.49, 3.17, 4.10, 4.19} GHz", "No",
+                        "{3.49, 3.17, 4.10, 4.19} GHz",
+                        "No",
                         "Bare frequencies drawn with a fixed seed; the resulting "
-                        "w_i/2pi = 3.49, 3.17, 4.10, 4.19 GHz.", "green"),
-                    row("coupling_J", "Float", "No",
+                        "w_i/2pi = 3.49, 3.17, 4.10, 4.19 GHz.",
+                        "green",
+                    ),
+                    row(
+                        "coupling_J",
+                        "Float",
+                        "No",
                         "build_spin_spin_interactions_random_distribution",
                         "J/2pi in [-50, 50] MHz (code uniform(-0.05, 0.05)), XX only",
-                        "No", "Random symmetric dipole-dipole couplings between every "
-                        "pair.", "green"),
-                    row("dissipation_gamma", "Float", "No", "GAMMA, GAMMA_PHI",
-                        "Gamma/2pi = 2.0 MHz (code 0.002); gamma_phi = 0", "No",
-                        "Collective relaxation rate.", "green"),
+                        "No",
+                        "Random symmetric dipole-dipole couplings between every "
+                        "pair.",
+                        "green",
+                    ),
+                    row(
+                        "dissipation_gamma",
+                        "Float",
+                        "No",
+                        "GAMMA, GAMMA_PHI",
+                        "Gamma/2pi = 2.0 MHz (code 0.002); gamma_phi = 0",
+                        "No",
+                        "Collective relaxation rate.",
+                        "green",
+                    ),
                 ],
             },
             {
                 "section": "DRIVE & PULSE PARAMETERS",
                 "rows": [
-                    row("drive_frequency", "Float", "No", "FREQ_AXIS / FREQ_STAR",
+                    row(
+                        "drive_frequency",
+                        "Float",
+                        "No",
+                        "FREQ_AXIS / FREQ_STAR",
                         "3.0-5.0 GHz, 400 pts (panel a); optimal wd/2pi = 4.15 GHz "
-                        "(panels b,c)", "No",
+                        "(panels b,c)",
+                        "No",
                         "Swept in the ring-down map; fixed at the ring-down-"
-                        "maximizing freq for b,c.", "green"),
-                    row("drive_amplitude", "Float", "No",
+                        "maximizing freq for b,c.",
+                        "green",
+                    ),
+                    row(
+                        "drive_amplitude",
+                        "Float",
+                        "No",
                         "AMP_BASE / AMP_SWEEP / AMP2_SWEEP",
                         "A1/2pi = 100 MHz base (code 0.10); sweeps 0 -> 0.10 in 60 "
-                        "steps", "No",
+                        "steps",
+                        "No",
                         "Fixed for the ring-down map; swept 0->0.10 for the amplitude "
-                        "panels (pulse-1 in b, pulse-2 in c).", "green"),
-                    row("pulse_timing", "Float", "No",
+                        "panels (pulse-1 in b, pulse-2 in c).",
+                        "green",
+                    ),
+                    row(
+                        "pulse_timing",
+                        "Float",
+                        "No",
                         "PULSE_RING / PULSE1_NS / GAP_NS / PULSE2_NS",
                         "single pulse: 200 ns; two-pulse: 200 ns / gap 100 ns / "
-                        "200 ns", "No",
+                        "200 ns",
+                        "No",
                         "tau = 200 ns; two-pulse protocol with inter-pulse gap "
-                        "tau_g = 100 ns.", "green"),
+                        "tau_g = 100 ns.",
+                        "green",
+                    ),
                 ],
             },
             {
                 "section": "TIME GRID",
                 "rows": [
-                    row("time_grid", "Float", "No", "T_MAX_NS, N_T",
-                        "0 to 1600 ns, 1000 points", "No",
-                        "Simulation time axis.", "blue"),
+                    row(
+                        "time_grid",
+                        "Float",
+                        "No",
+                        "T_MAX_NS, N_T",
+                        "0 to 1600 ns, 1000 points",
+                        "No",
+                        "Simulation time axis.",
+                        "blue",
+                    ),
                 ],
             },
             {
                 "section": "COMPUTED OUTPUT ARRAY",
                 "rows": [
-                    row("population", "Float", "No", "pop maps",
+                    row(
+                        "population",
+                        "Float",
+                        "No",
+                        "pop maps",
                         "<sigma+ sigma-> vs (freq,time), (amp,time), (amp2,time)",
-                        "No", "Collective excitation; ring-down, amplitude sweep, "
-                        "two-pulse sweep.", "orange"),
+                        "No",
+                        "Collective excitation; ring-down, amplitude sweep, "
+                        "two-pulse sweep.",
+                        "orange",
+                    ),
                 ],
             },
         ],
@@ -558,6 +670,7 @@ def build_column_info(n_freq, n_amp, n_t) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 # I/O
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _Tee:
     """Duplicate everything written to stdout into a log file as well, so each
@@ -596,7 +709,7 @@ def write_csv(data: np.ndarray, columns: list, path: str, chunk_rows: int = 500_
     first = True
     with open(path, "w", newline="", encoding="utf-8") as fh:
         for start in tqdm(range(0, n, chunk_rows), desc="CSV", unit="chunk"):
-            df = pd.DataFrame(data[start: start + chunk_rows], columns=columns)
+            df = pd.DataFrame(data[start : start + chunk_rows], columns=columns)
             df.to_csv(fh, index=False, header=first)
             first = False
 
@@ -604,6 +717,7 @@ def write_csv(data: np.ndarray, columns: list, path: str, chunk_rows: int = 500_
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def build_dataset(output_dir, workers=4, write_csv_file=True, smoke_test=False):
     """Public entry point. Tees all console output to a run log for
@@ -618,12 +732,15 @@ def build_dataset(output_dir, workers=4, write_csv_file=True, smoke_test=False):
     with open(log_path, "w", encoding="utf-8") as log_fh:
         sys.stdout = _Tee(original_stdout, log_fh)
         try:
-            print(f"# Experiment 8 run log — "
-                  f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} "
-                  f"({'SMOKE TEST' if smoke_test else 'full run'}, "
-                  f"workers={workers})")
-            result = _build_dataset_impl(output_dir, workers, write_csv_file,
-                                         smoke_test)
+            print(
+                f"# Experiment 8 run log — "
+                f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} "
+                f"({'SMOKE TEST' if smoke_test else 'full run'}, "
+                f"workers={workers})"
+            )
+            result = _build_dataset_impl(
+                output_dir, workers, write_csv_file, smoke_test
+            )
         finally:
             sys.stdout = original_stdout
 
@@ -647,14 +764,14 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
 
     freq_axis = np.linspace(F_MIN, F_MAX, n_freq)
     amp_sweep = np.linspace(AMP_LO, AMP_HI, n_amp)
-    tlist     = np.linspace(0.0, T_MAX_NS, n_t)
+    tlist = np.linspace(0.0, T_MAX_NS, n_t)
 
     n_total_rows = (n_freq + n_amp + n_amp) * n_t
 
     print(f"\nExperiment 8 dataset builder {'(SMOKE TEST)' if smoke_test else ''}")
-    print(f"Format          : long (one row per time sample)")
+    print("Format          : long (one row per time sample)")
     print(f"System          : N={N_TLS} coupled TLS, Lindblad master equation")
-    print(f"Panels          : 0=ring-down map, 1=amp sweep, 2=two-pulse sweep")
+    print("Panels          : 0=ring-down map, 1=amp sweep, 2=two-pulse sweep")
     print(f"Drive freqs     : {n_freq}  ({F_MIN}-{F_MAX} GHz, panel 0)")
     print(f"Amplitudes      : {n_amp}  ({AMP_LO}-{AMP_HI}, panels 1 & 2)")
     print(f"Time samples    : {n_t}  (0-{T_MAX_NS} ns)")
@@ -667,24 +784,27 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
 
     # ── panel 0: ring-down map + FREQ_STAR ───────────────────────────────────
     print("[panel 0] ring-down map ...")
-    pop_ring = _run_sweep("freq", freq_axis, None, tlist, init_freqs, H_int,
-                          workers, smoke_test)
+    pop_ring = _run_sweep(
+        "freq", freq_axis, None, tlist, init_freqs, H_int, workers, smoke_test
+    )
     mask_tail = tlist > PULSE1_NS
     if mask_tail.any():
         freq_star = float(freq_axis[np.argmax(pop_ring[:, mask_tail].sum(axis=1))])
-    else:                                     # tiny smoke grid may have no tail sample
+    else:  # tiny smoke grid may have no tail sample
         freq_star = float(freq_axis[np.argmax(pop_ring.sum(axis=1))])
     print(f"  FREQ_STAR     : {freq_star:.4f} GHz")
 
     # ── panel 1: single-pulse amplitude sweep ────────────────────────────────
     print("\n[panel 1] amplitude sweep ...")
-    pop_amp = _run_sweep("amp1", amp_sweep, freq_star, tlist, init_freqs, H_int,
-                         workers, smoke_test)
+    pop_amp = _run_sweep(
+        "amp1", amp_sweep, freq_star, tlist, init_freqs, H_int, workers, smoke_test
+    )
 
     # ── panel 2: two-pulse (A2) sweep ────────────────────────────────────────
     print("\n[panel 2] two-pulse sweep ...")
-    pop_double = _run_sweep("amp2", amp_sweep, freq_star, tlist, init_freqs, H_int,
-                            workers, smoke_test)
+    pop_double = _run_sweep(
+        "amp2", amp_sweep, freq_star, tlist, init_freqs, H_int, workers, smoke_test
+    )
 
     # ── assemble the long table ──────────────────────────────────────────────
     data_all = np.empty((n_total_rows, len(COLUMN_NAMES)), dtype=np.float32)
@@ -696,7 +816,8 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
             end = row_idx + n_t
             data_all[row_idx:end, COL["panel_id"]] = panel_id
             data_all[row_idx:end, COL["drive_frequency_GHz"]] = (
-                drive_freq[row_i] if np.ndim(drive_freq) else drive_freq)
+                drive_freq[row_i] if np.ndim(drive_freq) else drive_freq
+            )
             data_all[row_idx:end, COL["amp1"]] = a1[row_i] if np.ndim(a1) else a1
             data_all[row_idx:end, COL["amp2"]] = a2[row_i] if np.ndim(a2) else a2
             data_all[row_idx:end, COL["pulse1_ns"]] = p1
@@ -711,8 +832,17 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
     # panel 1: amp1 swept at freq_star; single pulse
     emit(1, freq_star, amp_sweep, 0.0, PULSE1_NS, 0.0, 0.0, pop_amp, amp_sweep)
     # panel 2: amp2 swept at freq_star; two pulses, amp1 fixed
-    emit(2, freq_star, AMP1_FIXED, amp_sweep, PULSE1_NS, GAP_NS, PULSE2_NS,
-         pop_double, amp_sweep)
+    emit(
+        2,
+        freq_star,
+        AMP1_FIXED,
+        amp_sweep,
+        PULSE1_NS,
+        GAP_NS,
+        PULSE2_NS,
+        pop_double,
+        amp_sweep,
+    )
 
     data_final = data_all[:row_idx]
 
@@ -736,14 +866,14 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
     with open(cols_path, "w", encoding="utf-8") as fh:
         json.dump(column_doc, fh, indent=2)
 
-    print(f"\nDone!")
+    print("\nDone!")
     print(f"  Shape       : ({row_idx:,}, {len(COLUMN_NAMES)})")
-    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path)/1024**2:.1f} MB)")
+    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path) / 1024**2:.1f} MB)")
     print(f"  metadata    : {meta_path}")
     print(f"  column_info : {cols_path}")
 
     # ── sanity checks ────────────────────────────────────────────────────────
-    print(f"\nRunning sanity checks ...")
+    print("\nRunning sanity checks ...")
     errors = []
 
     if row_idx != n_total_rows:
@@ -756,7 +886,7 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
     if n_nan or n_inf:
         errors.append(f"  [FAIL] {n_nan} NaN and {n_inf} Inf values present")
     else:
-        print(f"  [PASS] No NaN or Inf values")
+        print("  [PASS] No NaN or Inf values")
 
     pop = data_final[:, COL["population"]]
     if pop.min() < -1e-3:
@@ -772,17 +902,21 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
 
     ts = data_final[:, COL["timestamp_ns"]]
     if ts.min() < -1e-6 or abs(ts.max() - tlist[-1]) > 1e-3:
-        errors.append(f"  [FAIL] Timestamp range: [{ts.min():.3f}, {ts.max():.3f}] "
-                      f"(expected [0, {tlist[-1]:.3f}])")
+        errors.append(
+            f"  [FAIL] Timestamp range: [{ts.min():.3f}, {ts.max():.3f}] "
+            f"(expected [0, {tlist[-1]:.3f}])"
+        )
     else:
         print(f"  [PASS] Timestamp range: [{ts.min():.3f}, {ts.max():.3f}] ns")
 
     # pulse2_ns and gap_ns must be non-zero only for panel 2.
     c_mask = data_final[:, COL["panel_id"]] == 2
-    ok_p2 = (np.all(data_final[c_mask, COL["pulse2_ns"]] == PULSE2_NS) and
-             np.all(data_final[~c_mask, COL["pulse2_ns"]] == 0.0))
-    ok_gap = (np.all(data_final[c_mask, COL["gap_ns"]] == GAP_NS) and
-              np.all(data_final[~c_mask, COL["gap_ns"]] == 0.0))
+    ok_p2 = np.all(data_final[c_mask, COL["pulse2_ns"]] == PULSE2_NS) and np.all(
+        data_final[~c_mask, COL["pulse2_ns"]] == 0.0
+    )
+    ok_gap = np.all(data_final[c_mask, COL["gap_ns"]] == GAP_NS) and np.all(
+        data_final[~c_mask, COL["gap_ns"]] == 0.0
+    )
     if not (ok_p2 and ok_gap):
         errors.append("  [FAIL] gap_ns/pulse2_ns should be non-zero only for panel 2")
     else:
@@ -798,21 +932,23 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
     if not np.array_equal(reloaded["data"], data_final):
         errors.append("  [FAIL] Pickle round-trip: reloaded data differs")
     else:
-        print(f"  [PASS] Pickle round-trip: reloaded array matches exactly")
+        print("  [PASS] Pickle round-trip: reloaded array matches exactly")
 
     if errors:
         print(f"\n  {len(errors)} sanity check(s) FAILED:")
         for e in errors:
             print(e)
     else:
-        print(f"\n  All sanity checks passed.")
+        print("\n  All sanity checks passed.")
 
     # ── CSV ──────────────────────────────────────────────────────────────────
     if write_csv_file:
         print(f"\nWriting CSV to {csv_path} ...")
         write_csv(data_final, COLUMN_NAMES, csv_path)
-        print(f"  CSV         : {csv_path}  "
-              f"({os.path.getsize(csv_path)/1024**2:.1f} MB, {row_idx:,} rows)")
+        print(
+            f"  CSV         : {csv_path}  "
+            f"({os.path.getsize(csv_path) / 1024**2:.1f} MB, {row_idx:,} rows)"
+        )
 
     return pkl_path
 
@@ -826,18 +962,25 @@ if __name__ == "__main__":
         "pickle and a CSV (N=4 TLS amplitude and multi-pulse control)."
     )
     parser.add_argument(
-        "--output_dir", type=str, default=_script_dir,
+        "--output_dir",
+        type=str,
+        default=_script_dir,
         help="Where to write experiment_8/ (default: next to this script).",
     )
     parser.add_argument(
-        "--workers", type=int, default=4,
+        "--workers",
+        type=int,
+        default=4,
         help="Parallel solver processes (real run only; ignored in smoke test).",
     )
     parser.add_argument(
-        "--no_csv", action="store_true", help="Skip the CSV, write only the pickle.",
+        "--no_csv",
+        action="store_true",
+        help="Skip the CSV, write only the pickle.",
     )
     parser.add_argument(
-        "--smoke-test", action="store_true",
+        "--smoke-test",
+        action="store_true",
         help="Tiny grids + synthetic population; no qutip required.",
     )
     args = parser.parse_args()
