@@ -171,7 +171,7 @@ EXPECTED_PHASE_DEG = np.arange(0, 361, 3)  # 121 values
 PULSE_WIDTH_TICKS = 308
 AWG_CLOCK_MHZ = 9830.4  # pulse generator's clock -> 1 tick   ~= 0.1017 ns
 ADC_CLOCK_MHZ = 552.96  # digitiser's clock       -> 1 sample ~= 1.8084 ns
-N_TIME_SAMPLES = 1000   # how many instants are recorded per ring-down
+N_TIME_SAMPLES = 1000  # how many instants are recorded per ring-down
 
 PULSE_WIDTH_NS = (PULSE_WIDTH_TICKS / AWG_CLOCK_MHZ) * 1000  # ~= 31.33 ns
 # The clock along each recorded trace. The digitiser samples every ~1.8 ns, so
@@ -315,13 +315,11 @@ def build_metadata(campaign_start_iso: str = None, run_starts: dict = None) -> d
                 "n": len(FREQUENCY_LIST_MHZ),
                 "unit": "MHz",
                 "values": FREQUENCY_LIST_MHZ,
-                
             },
             "inter_pulse_spacing": {
                 "n": len(SPACING_LIST_NS),
                 "unit": "ns",
                 "values": SPACING_LIST_NS,
-                
             },
             "pulse_phase": {
                 "n": len(EXPECTED_PHASE_DEG),
@@ -556,15 +554,17 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     n_phases = len(EXPECTED_PHASE_DEG)
     n_total_rows = n_temps * n_freqs * n_spacings * n_phases * N_TIME_SAMPLES
 
-    print(f"\nFormat          : long (one row per time sample)")
+    print("\nFormat          : long (one row per time sample)")
     print(f"Sample          : {SAMPLE_NAMES[0]} (sapphire + Shipley 1813)")
     print(f"Temperatures    : {n_temps}  ({[t for t, _ in TEMPERATURE_RUNS]} mK)")
     print(f"Frequencies     : {n_freqs}  ({FREQUENCY_LIST_MHZ} MHz)")
     print(f"Spacings        : {n_spacings}  ({SPACING_LIST_NS} ns)")
     print(f"Phases          : {n_phases}  (0-360 deg, step 3)")
     print(f"Time samples    : {N_TIME_SAMPLES} per measurement")
-    print(f"Total rows      : {n_temps} x {n_freqs} x {n_spacings} x {n_phases} x "
-          f"{N_TIME_SAMPLES} = {n_total_rows:,}")
+    print(
+        f"Total rows      : {n_temps} x {n_freqs} x {n_spacings} x {n_phases} x "
+        f"{N_TIME_SAMPLES} = {n_total_rows:,}"
+    )
     print(f"Columns         : {COLUMN_NAMES}\n")
 
     # ── Pass 1: find the campaign start and each run's start ─────────────────
@@ -597,7 +597,7 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     # ── Pass 2: build ────────────────────────────────────────────────────────
     data_all = np.empty((n_total_rows, len(COLUMN_NAMES)), dtype=np.float32)
     row_idx = 0
-    sample_id = SAMPLES[0][1]
+    # sample_id = SAMPLES[0][1]
     n_files = 0
 
     for temperature_mk, exp_id in tqdm(TEMPERATURE_RUNS, desc="Temperatures"):
@@ -620,13 +620,17 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
                     time_stamps = z["time_stamp_list"]
 
                 if IQ_matrix.shape != (2, n_phases, N_TIME_SAMPLES):
-                    print(f"  WARNING: {filename} has shape {IQ_matrix.shape}, "
-                          f"expected (2, {n_phases}, {N_TIME_SAMPLES}) — skipping")
+                    print(
+                        f"  WARNING: {filename} has shape {IQ_matrix.shape}, "
+                        f"expected (2, {n_phases}, {N_TIME_SAMPLES}) — skipping"
+                    )
                     continue
 
                 if not np.array_equal(phase_array, EXPECTED_PHASE_DEG):
-                    print(f"  WARNING: {filename} pulse_phase_array does not match "
-                          f"np.arange(0, 361, 3) — using the file's own axis")
+                    print(
+                        f"  WARNING: {filename} pulse_phase_array does not match "
+                        f"np.arange(0, 361, 3) — using the file's own axis"
+                    )
 
                 # Wall-clock time, i.e. when this reading was actually taken in
                 # the lab. Stored as SECONDS SINCE THE CAMPAIGN STARTED (the 8 mK
@@ -658,8 +662,12 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
                     data_all[row_idx:end_idx, COL["phase_deg"]] = phase_deg
                     data_all[row_idx:end_idx, COL["timestamp_ns"]] = TIMESTAMPS_NS
                     data_all[row_idx:end_idx, COL["elapsed_s"]] = elapsed[phase_idx]
-                    data_all[row_idx:end_idx, COL["I"]] = I_matrix[phase_idx]  # all 1000
-                    data_all[row_idx:end_idx, COL["Q"]] = Q_matrix[phase_idx]  # all 1000
+                    data_all[row_idx:end_idx, COL["I"]] = I_matrix[
+                        phase_idx
+                    ]  # all 1000
+                    data_all[row_idx:end_idx, COL["Q"]] = Q_matrix[
+                        phase_idx
+                    ]  # all 1000
 
                     row_idx += N_TIME_SAMPLES
 
@@ -685,33 +693,41 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     with open(cols_path, "w", encoding="utf-8") as fh:
         json.dump(build_column_info(), fh, indent=2)
 
-    print(f"\nDone!")
+    print("\nDone!")
     print(f"  Shape       : ({row_idx:,}, {len(COLUMN_NAMES)})")
-    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path)/1024**2:.1f} MB)")
+    print(f"  Pickle      : {pkl_path}  ({os.path.getsize(pkl_path) / 1024**2:.1f} MB)")
     print(f"  metadata    : {meta_path}")
     print(f"  column_info : {cols_path}")
 
     # ── Sanity checks ────────────────────────────────────────────────────────
-    print(f"\nRunning sanity checks ...")
+    print("\nRunning sanity checks ...")
     errors = []
 
     if row_idx != n_total_rows:
         errors.append(f"  [FAIL] Row count: got {row_idx:,}, expected {n_total_rows:,}")
     else:
-        print(f"  [PASS] Row count: {row_idx:,} = {n_temps} temps x {n_freqs} freqs "
-              f"x {n_spacings} spacings x {n_phases} phases x {N_TIME_SAMPLES}")
+        print(
+            f"  [PASS] Row count: {row_idx:,} = {n_temps} temps x {n_freqs} freqs "
+            f"x {n_spacings} spacings x {n_phases} phases x {N_TIME_SAMPLES}"
+        )
 
     iq = data_final[:, [COL["I"], COL["Q"]]]
     n_nan = int(np.isnan(iq).sum())
     if n_nan:
         errors.append(f"  [FAIL] I/Q contain {n_nan} NaN values")
     else:
-        print(f"  [PASS] No NaN in I/Q")
+        print("  [PASS] No NaN in I/Q")
 
-    I_min, I_max = float(data_final[:, COL["I"]].min()), float(data_final[:, COL["I"]].max())
-    Q_min, Q_max = float(data_final[:, COL["Q"]].min()), float(data_final[:, COL["Q"]].max())
-    print(f"  [INFO] I range: [{I_min:.1f}, {I_max:.1f}]   "
-          f"Q range: [{Q_min:.1f}, {Q_max:.1f}]")
+    I_min, I_max = float(data_final[:, COL["I"]].min()), float(
+        data_final[:, COL["I"]].max()
+    )
+    Q_min, Q_max = float(data_final[:, COL["Q"]].min()), float(
+        data_final[:, COL["Q"]].max()
+    )
+    print(
+        f"  [INFO] I range: [{I_min:.1f}, {I_max:.1f}]   "
+        f"Q range: [{Q_min:.1f}, {Q_max:.1f}]"
+    )
 
     for col_idx, name, expected in [
         (COL["temperature_mK"], "temperatures", n_temps),
@@ -730,32 +746,38 @@ def build_dataset(data_dir: str, output_dir: str, write_csv_file: bool = True):
     if n_at_100 == 0:
         errors.append("  [FAIL] spacing_ns == 100 matches no rows after upcast")
     else:
-        print(f"  [PASS] spacing_ns exact under float64 upcast "
-              f"({n_at_100:,} rows at 100 ns)")
+        print(
+            f"  [PASS] spacing_ns exact under float64 upcast "
+            f"({n_at_100:,} rows at 100 ns)"
+        )
 
     el = data_final[:, COL["elapsed_s"]]
-    print(f"  [INFO] elapsed_s range: [{el.min():.0f}, {el.max():.0f}] s "
-          f"({(el.max()-el.min())/3600:.1f} h campaign)")
+    print(
+        f"  [INFO] elapsed_s range: [{el.min():.0f}, {el.max():.0f}] s "
+        f"({(el.max() - el.min()) / 3600:.1f} h campaign)"
+    )
 
     reloaded = load_pickle(pkl_path)
     if not np.array_equal(reloaded["data"], data_final):
         errors.append("  [FAIL] Pickle round-trip: reloaded data differs")
     else:
-        print(f"  [PASS] Pickle round-trip: reloaded array matches exactly")
+        print("  [PASS] Pickle round-trip: reloaded array matches exactly")
 
     if errors:
         print(f"\n  {len(errors)} sanity check(s) FAILED:")
         for e in errors:
             print(e)
     else:
-        print(f"\n  All sanity checks passed.")
+        print("\n  All sanity checks passed.")
 
     # ── CSV ──────────────────────────────────────────────────────────────────
     if write_csv_file:
         print(f"\nWriting CSV to {csv_path} ...")
         write_csv(data_final, COLUMN_NAMES, csv_path)
-        print(f"  CSV         : {csv_path}  "
-              f"({os.path.getsize(csv_path)/1024**2:.1f} MB, {row_idx:,} rows)")
+        print(
+            f"  CSV         : {csv_path}  "
+            f"({os.path.getsize(csv_path) / 1024**2:.1f} MB, {row_idx:,} rows)"
+        )
 
 
 if __name__ == "__main__":

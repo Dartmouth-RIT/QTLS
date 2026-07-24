@@ -135,33 +135,40 @@ N_PULSES = 50
 
 # Drive-frequency sweep. Treated numerically as GHz == ns^-1.
 F_MIN, F_MAX = 3.0, 5.0
-N_FREQ       = 400
+N_FREQ = 400
 
 # Time grid: 0 to 1000 ns, 1000 points.
 T_MAX_NS, N_T = 1000, 1000
 
 # The N = 2 TLS. Frequencies hard-coded; coupling is built (J=0.05 XX) but the
 # source solver DROPS it -> the TLS are effectively uncoupled (see header).
-N_TLS      = 2
+N_TLS = 2
 INIT_FREQS = [4.0, 4.1]
-J_COUP     = 0.05
+J_COUP = 0.05
 
 # Dissipation and drive amplitude.
 GAMMA, GAMMA_PHI = 0.002, 0.0
-DRIVE_AMPL       = 0.1
+DRIVE_AMPL = 0.1
 
 # Phase-V FFT settings.
-FFT_VIEW_MHZ       = 150.0
+FFT_VIEW_MHZ = 150.0
 PHASEV_WIN_START_NS = 0.0
-PHASEV_WIN_STOP_NS  = 400.0
+PHASEV_WIN_STOP_NS = 400.0
 
 # ── table schemas ────────────────────────────────────────────────────────────
-POSTPULSE_COLUMNS  = ["pulse_duration_ns", "drive_frequency_GHz",
-                      "postpulse_population"]
-POPTRACE_COLUMNS   = ["pulse_duration_ns", "drive_frequency_GHz",
-                      "timestamp_ns", "population"]
-PHASEV_COLUMNS     = ["pulse_duration_ns", "drive_frequency_GHz",
-                      "fft_frequency_MHz", "normalized_phase_fft"]
+POSTPULSE_COLUMNS = ["pulse_duration_ns", "drive_frequency_GHz", "postpulse_population"]
+POPTRACE_COLUMNS = [
+    "pulse_duration_ns",
+    "drive_frequency_GHz",
+    "timestamp_ns",
+    "population",
+]
+PHASEV_COLUMNS = [
+    "pulse_duration_ns",
+    "drive_frequency_GHz",
+    "fft_frequency_MHz",
+    "normalized_phase_fft",
+]
 
 PICKLE_PROTOCOL = 4
 
@@ -175,12 +182,14 @@ def top_pulse_indices(pulses):
 # ENSEMBLE
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def build_H_int():
     """Build the (nominal) XX coupling operator.
     NOTE: the solver discards this operator (see the UNCOUPLED note in the module
     docstring); it is built here only so the real solver path receives the same
     arguments as the original implementation."""
     from hamiltonian_generator import build_spin_spin_interactions_random_distribution
+
     return build_spin_spin_interactions_random_distribution(
         N_TLS, J_COUP, J_COUP, alpha_x=1.0, alpha_y=0.0, alpha_z=0.0
     )
@@ -190,14 +199,17 @@ def build_H_int():
 # SYNTHETIC ARRAYS — smoke-test stand-in for the QuTiP solver (no physics).
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _synthetic_full(freq, amp, tlist, init_freqs, pulse_ns):
     """Return (sp1, sp2, pop) surrogates. NOT physical; plumbing only."""
     detune = np.min(np.abs(np.asarray(init_freqs) - freq))
     lorentz = 1.0 / (1.0 + (detune / 0.15) ** 2)
-    drive = amp * lorentz * np.sin(
-        np.pi * np.clip(tlist / max(pulse_ns, 1e-9), 0, 1)) ** 2
-    tail = np.where(tlist > pulse_ns,
-                    amp * lorentz * np.exp(-GAMMA * (tlist - pulse_ns)), 0.0)
+    drive = (
+        amp * lorentz * np.sin(np.pi * np.clip(tlist / max(pulse_ns, 1e-9), 0, 1)) ** 2
+    )
+    tail = np.where(
+        tlist > pulse_ns, amp * lorentz * np.exp(-GAMMA * (tlist - pulse_ns)), 0.0
+    )
     pop = np.clip(np.where(tlist <= pulse_ns, drive, tail), 0.0, None)
     env = np.exp(-GAMMA * tlist)
     sp1 = amp * env * np.exp(1j * init_freqs[0] * tlist * 0.05)
@@ -217,16 +229,32 @@ def _init_worker(tlist, init_freqs, H_int, gamma, gamma_phi, amp):
     so each task only ships (freq, pulse_ns, j_post, want_full)."""
     global _G
     from hamiltonian_generator import run_simulation_for_frequency
-    _G = dict(tlist=tlist, init_freqs=init_freqs, H_int=H_int, gamma=gamma,
-              gamma_phi=gamma_phi, amp=amp, fn=run_simulation_for_frequency)
+
+    _G = dict(
+        tlist=tlist,
+        init_freqs=init_freqs,
+        H_int=H_int,
+        gamma=gamma,
+        gamma_phi=gamma_phi,
+        amp=amp,
+        fn=run_simulation_for_frequency,
+    )
 
 
 def _worker(task):
     """Return (postpulse_scalar, sp1, sp2, pop) — sp1/sp2/pop only when want_full,
     to keep inter-process traffic small for the non-representative pulses."""
     freq, pulse_ns, j_post, want_full = task
-    sp1, sp2, pop = _G["fn"](freq, _G["tlist"], _G["init_freqs"], _G["H_int"],
-                             _G["gamma"], _G["gamma_phi"], _G["amp"], pulse_ns)
+    sp1, sp2, pop = _G["fn"](
+        freq,
+        _G["tlist"],
+        _G["init_freqs"],
+        _G["H_int"],
+        _G["gamma"],
+        _G["gamma_phi"],
+        _G["amp"],
+        pulse_ns,
+    )
     pop = np.asarray(pop, dtype=np.float64).real
     scalar = float(pop[j_post])
     if want_full:
@@ -265,8 +293,10 @@ def compute_phaseV(phi_buffer, tlist, dt):
 # METADATA
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_metadata(pulses, top_idx, freq_axis, tlist, fft_freq_MHz,
-                   smoke_test=False) -> dict:
+
+def build_metadata(
+    pulses, top_idx, freq_axis, tlist, fft_freq_MHz, smoke_test=False
+) -> dict:
     return {
         "experiment_id": "experiment_10",
         "title": "Ring-down & Phase Sharpening vs Pulse Duration (N=2 TLS simulation)",
@@ -297,10 +327,10 @@ def build_metadata(pulses, top_idx, freq_axis, tlist, fft_freq_MHz,
             "observables": {
                 "population": "<sigma+ sigma-> collective excitation (dimensionless)",
                 "phase_difference": "phi(t) = arg<sigma+_1> - arg<sigma+_2>, "
-                                    "wrapped to (-pi, pi]",
+                "wrapped to (-pi, pi]",
             },
             "drive": "square pulse, amp*cos(freq*t) for t <= pulse_ns (no ramp), "
-                     "per the active drive definition",
+            "per the active drive definition",
             "unit_convention": (
                 "Frequencies used numerically as inverse nanoseconds (GHz == ns^-1) "
                 "with NO factor of 2*pi. Amplitude dimensionless; phase in radians; "
@@ -317,16 +347,21 @@ def build_metadata(pulses, top_idx, freq_axis, tlist, fft_freq_MHz,
         },
         "grids": {
             "pulse_durations_ns": {
-                "n": len(pulses), "min": float(pulses[0]), "max": float(pulses[-1]),
+                "n": len(pulses),
+                "min": float(pulses[0]),
+                "max": float(pulses[-1]),
                 "formula": "linspace(20, 200, 50)",
             },
             "representative_pulses_ns": [round(float(pulses[i]), 4) for i in top_idx],
             "drive_frequency_GHz": {
-                "n": len(freq_axis), "range": [F_MIN, F_MAX],
+                "n": len(freq_axis),
+                "range": [F_MIN, F_MAX],
                 "formula": "linspace(3.0, 5.0, 400)",
             },
             "time_grid": {
-                "t_min_ns": 0.0, "t_max_ns": T_MAX_NS, "n_samples": len(tlist),
+                "t_min_ns": 0.0,
+                "t_max_ns": T_MAX_NS,
+                "n_samples": len(tlist),
                 "one_sample_ns": float(tlist[1] - tlist[0]) if len(tlist) > 1 else 0.0,
             },
             "phaseV": {
@@ -337,17 +372,23 @@ def build_metadata(pulses, top_idx, freq_axis, tlist, fft_freq_MHz,
             },
         },
         "tables": {
-            "postpulse_map": {"columns": POSTPULSE_COLUMNS,
-                              "n_rows": len(pulses) * len(freq_axis)},
-            "population_traces": {"columns": POPTRACE_COLUMNS,
-                                  "n_rows": len(top_idx) * len(freq_axis) * len(tlist)},
-            "phaseV_fft": {"columns": PHASEV_COLUMNS,
-                           "n_rows": len(top_idx) * len(freq_axis) * len(fft_freq_MHz)},
+            "postpulse_map": {
+                "columns": POSTPULSE_COLUMNS,
+                "n_rows": len(pulses) * len(freq_axis),
+            },
+            "population_traces": {
+                "columns": POPTRACE_COLUMNS,
+                "n_rows": len(top_idx) * len(freq_axis) * len(tlist),
+            },
+            "phaseV_fft": {
+                "columns": PHASEV_COLUMNS,
+                "n_rows": len(top_idx) * len(freq_axis) * len(fft_freq_MHz),
+            },
         },
         "provenance": {
             "physics_module": "hamiltonian_generator.py (QuTiP-5 API shim only)",
             "attribution": "Uses code and simulation methods from the "
-                           "Fitzpatrick Lab, Dartmouth College.",
+            "Fitzpatrick Lab, Dartmouth College.",
             "no_new_physics": True,
             "reproduces_uncoupled_quirk": True,
             "smoke_test": smoke_test,
@@ -365,53 +406,100 @@ def build_column_info(pulses, top_idx, freq_axis, tlist, fft_freq_MHz) -> dict:
                 "format": "long (one row per pulse x drive frequency)",
                 "n_rows": len(pulses) * len(freq_axis),
                 "columns": [
-                    {"name": "pulse_duration_ns", "dtype": "float32", "unit": "ns",
-                     "role": "coordinate", "description": "Drive pulse duration "
-                     "(20-200 ns, 50 values)."},
-                    {"name": "drive_frequency_GHz", "dtype": "float32",
-                     "unit": "GHz (== ns^-1)", "role": "coordinate",
-                     "description": "Drive frequency (3.0-5.0 GHz, 400 values)."},
-                    {"name": "postpulse_population", "dtype": "float32",
-                     "unit": "dimensionless", "role": "observable",
-                     "description": "<sigma+ sigma-> sampled at the first time "
-                     "sample after the pulse ends (first t > pulse_duration_ns)."},
+                    {
+                        "name": "pulse_duration_ns",
+                        "dtype": "float32",
+                        "unit": "ns",
+                        "role": "coordinate",
+                        "description": "Drive pulse duration "
+                        "(20-200 ns, 50 values).",
+                    },
+                    {
+                        "name": "drive_frequency_GHz",
+                        "dtype": "float32",
+                        "unit": "GHz (== ns^-1)",
+                        "role": "coordinate",
+                        "description": "Drive frequency (3.0-5.0 GHz, 400 values).",
+                    },
+                    {
+                        "name": "postpulse_population",
+                        "dtype": "float32",
+                        "unit": "dimensionless",
+                        "role": "observable",
+                        "description": "<sigma+ sigma-> sampled at the first time "
+                        "sample after the pulse ends (first t > pulse_duration_ns).",
+                    },
                 ],
             },
             "population_traces": {
                 "format": "long (one row per representative pulse x freq x time)",
                 "n_rows": len(top_idx) * len(freq_axis) * len(tlist),
                 "columns": [
-                    {"name": "pulse_duration_ns", "dtype": "float32", "unit": "ns",
-                     "role": "coordinate", "description": "One of the three "
-                     "representative pulses (shortest, middle, longest)."},
-                    {"name": "drive_frequency_GHz", "dtype": "float32",
-                     "unit": "GHz", "role": "coordinate",
-                     "description": "Drive frequency (3.0-5.0 GHz, 400 values)."},
-                    {"name": "timestamp_ns", "dtype": "float32", "unit": "ns",
-                     "role": "coordinate (time axis)",
-                     "description": "Simulation time (0-1000 ns, 1000 samples)."},
-                    {"name": "population", "dtype": "float32", "unit": "dimensionless",
-                     "role": "observable",
-                     "description": "Full <sigma+ sigma-> time trace."},
+                    {
+                        "name": "pulse_duration_ns",
+                        "dtype": "float32",
+                        "unit": "ns",
+                        "role": "coordinate",
+                        "description": "One of the three "
+                        "representative pulses (shortest, middle, longest).",
+                    },
+                    {
+                        "name": "drive_frequency_GHz",
+                        "dtype": "float32",
+                        "unit": "GHz",
+                        "role": "coordinate",
+                        "description": "Drive frequency (3.0-5.0 GHz, 400 values).",
+                    },
+                    {
+                        "name": "timestamp_ns",
+                        "dtype": "float32",
+                        "unit": "ns",
+                        "role": "coordinate (time axis)",
+                        "description": "Simulation time (0-1000 ns, 1000 samples).",
+                    },
+                    {
+                        "name": "population",
+                        "dtype": "float32",
+                        "unit": "dimensionless",
+                        "role": "observable",
+                        "description": "Full <sigma+ sigma-> time trace.",
+                    },
                 ],
             },
             "phaseV_fft": {
                 "format": "long (one row per representative pulse x freq x fft bin)",
                 "n_rows": len(top_idx) * len(freq_axis) * len(fft_freq_MHz),
                 "columns": [
-                    {"name": "pulse_duration_ns", "dtype": "float32", "unit": "ns",
-                     "role": "coordinate", "description": "Representative pulse."},
-                    {"name": "drive_frequency_GHz", "dtype": "float32",
-                     "unit": "GHz", "role": "coordinate",
-                     "description": "Drive frequency (3.0-5.0 GHz, 400 values)."},
-                    {"name": "fft_frequency_MHz", "dtype": "float32", "unit": "MHz",
-                     "role": "coordinate (FFT axis)",
-                     "description": "Positive FFT frequency of phi(t), 0-150 MHz."},
-                    {"name": "normalized_phase_fft", "dtype": "float32",
-                     "unit": "dimensionless (0-1)", "role": "observable",
-                     "description": "Row-wise normalized |FFT[phi(t)]| over the "
-                     "0-400 ns window, where phi = arg<sigma+_1> - arg<sigma+_2>. "
-                     "Normalized to peak 1 per drive frequency."},
+                    {
+                        "name": "pulse_duration_ns",
+                        "dtype": "float32",
+                        "unit": "ns",
+                        "role": "coordinate",
+                        "description": "Representative pulse.",
+                    },
+                    {
+                        "name": "drive_frequency_GHz",
+                        "dtype": "float32",
+                        "unit": "GHz",
+                        "role": "coordinate",
+                        "description": "Drive frequency (3.0-5.0 GHz, 400 values).",
+                    },
+                    {
+                        "name": "fft_frequency_MHz",
+                        "dtype": "float32",
+                        "unit": "MHz",
+                        "role": "coordinate (FFT axis)",
+                        "description": "Positive FFT frequency of phi(t), 0-150 MHz.",
+                    },
+                    {
+                        "name": "normalized_phase_fft",
+                        "dtype": "float32",
+                        "unit": "dimensionless (0-1)",
+                        "role": "observable",
+                        "description": "Row-wise normalized |FFT[phi(t)]| over the "
+                        "0-400 ns window, where phi = arg<sigma+_1> - arg<sigma+_2>. "
+                        "Normalized to peak 1 per drive frequency.",
+                    },
                 ],
             },
         },
@@ -421,6 +509,7 @@ def build_column_info(pulses, top_idx, freq_axis, tlist, fft_freq_MHz) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 # I/O
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _Tee:
     """Duplicate stdout into a log file for reverification. tqdm uses stderr, so
@@ -451,12 +540,14 @@ def load_pickle(path):
 
 def write_csv(data, columns, path, chunk_rows=500_000):
     import pandas as pd
+
     n = len(data)
     first = True
     with open(path, "w", newline="", encoding="utf-8") as fh:
-        for start in tqdm(range(0, n, chunk_rows), desc=os.path.basename(path),
-                          unit="chunk"):
-            df = pd.DataFrame(data[start: start + chunk_rows], columns=columns)
+        for start in tqdm(
+            range(0, n, chunk_rows), desc=os.path.basename(path), unit="chunk"
+        ):
+            df = pd.DataFrame(data[start : start + chunk_rows], columns=columns)
             df.to_csv(fh, index=False, header=first)
             first = False
 
@@ -465,11 +556,12 @@ def write_csv(data, columns, path, chunk_rows=500_000):
 # SOLVE
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def run_all(pulses, top_idx, freq_axis, tlist, workers, smoke_test):
     """Run the full pulse x frequency sweep, returning:
-        postpulse_map     (n_pulses, n_freq)
-        top_pop_maps      dict pulse_idx -> (n_freq, n_t)
-        top_phi_maps      dict pulse_idx -> (n_freq, n_t)   wrapped phase
+    postpulse_map     (n_pulses, n_freq)
+    top_pop_maps      dict pulse_idx -> (n_freq, n_t)
+    top_phi_maps      dict pulse_idx -> (n_freq, n_t)   wrapped phase
     """
     n_pulses, n_freq, n_t = len(pulses), len(freq_axis), len(tlist)
     postpulse_map = np.zeros((n_pulses, n_freq), dtype=np.float32)
@@ -489,8 +581,9 @@ def run_all(pulses, top_idx, freq_axis, tlist, workers, smoke_test):
             j_post = first_index_after(tlist, float(pulse_ns))
             want_full = pi in top_set
             for fi, f in enumerate(freq_axis):
-                sp1, sp2, pop = _synthetic_full(f, DRIVE_AMPL, tlist, INIT_FREQS,
-                                                float(pulse_ns))
+                sp1, sp2, pop = _synthetic_full(
+                    f, DRIVE_AMPL, tlist, INIT_FREQS, float(pulse_ns)
+                )
                 postpulse_map[pi, fi] = pop[j_post]
                 if want_full:
                     top_pop_maps[pi][fi] = pop.astype(np.float32)
@@ -499,6 +592,7 @@ def run_all(pulses, top_idx, freq_axis, tlist, workers, smoke_test):
 
     # ── real physics: one shared pool, all (pulse, freq) tasks ────────────────
     from concurrent.futures import ProcessPoolExecutor, as_completed
+
     H_int = build_H_int()
 
     tasks = []
@@ -510,7 +604,8 @@ def run_all(pulses, top_idx, freq_axis, tlist, workers, smoke_test):
 
     n_workers = max(1, min(workers, len(tasks)))
     with ProcessPoolExecutor(
-        n_workers, initializer=_init_worker,
+        n_workers,
+        initializer=_init_worker,
         initargs=(tlist, INIT_FREQS, H_int, GAMMA, GAMMA_PHI, DRIVE_AMPL),
     ) as pool:
         futures = {pool.submit(_worker, t[2]): (t[0], t[1]) for t in tasks}
@@ -527,6 +622,7 @@ def run_all(pulses, top_idx, freq_axis, tlist, workers, smoke_test):
 # ─────────────────────────────────────────────────────────────────────────────
 # TABLE ASSEMBLY
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def assemble_postpulse(pulses, freq_axis, postpulse_map):
     n = len(pulses) * len(freq_axis)
@@ -579,6 +675,7 @@ def assemble_phaseV(pulses, top_idx, freq_axis, top_phi_maps, tlist, dt):
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def build_dataset(output_dir, workers=4, write_csv_file=True, smoke_test=False):
     """Public entry point. Tees stdout to a reverification log, then builds."""
     exp_dir = os.path.join(output_dir, "experiment_10")
@@ -589,12 +686,15 @@ def build_dataset(output_dir, workers=4, write_csv_file=True, smoke_test=False):
     with open(log_path, "w", encoding="utf-8") as log_fh:
         sys.stdout = _Tee(original_stdout, log_fh)
         try:
-            print(f"# Experiment 10 run log — "
-                  f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} "
-                  f"({'SMOKE TEST' if smoke_test else 'full run'}, "
-                  f"workers={workers})")
-            result = _build_dataset_impl(output_dir, workers, write_csv_file,
-                                         smoke_test)
+            print(
+                f"# Experiment 10 run log — "
+                f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} "
+                f"({'SMOKE TEST' if smoke_test else 'full run'}, "
+                f"workers={workers})"
+            )
+            result = _build_dataset_impl(
+                output_dir, workers, write_csv_file, smoke_test
+            )
         finally:
             sys.stdout = original_stdout
 
@@ -612,39 +712,42 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
     else:
         n_pulses, n_freq, n_t = N_PULSES, N_FREQ, N_T
 
-    pulses    = np.linspace(PULSE_MIN_NS, PULSE_MAX_NS, n_pulses)
+    pulses = np.linspace(PULSE_MIN_NS, PULSE_MAX_NS, n_pulses)
     freq_axis = np.linspace(F_MIN, F_MAX, n_freq)
-    tlist     = np.linspace(0.0, T_MAX_NS, n_t)
-    dt        = float(tlist[1] - tlist[0]) if n_t > 1 else 1.0
-    top_idx   = top_pulse_indices(pulses)
+    tlist = np.linspace(0.0, T_MAX_NS, n_t)
+    dt = float(tlist[1] - tlist[0]) if n_t > 1 else 1.0
+    top_idx = top_pulse_indices(pulses)
 
     print(f"\nExperiment 10 dataset builder {'(SMOKE TEST)' if smoke_test else ''}")
     print(f"UNCOUPLED N=2 TLS (source quirk reproduced) at {INIT_FREQS} GHz")
     print(f"Pulses          : {n_pulses}  ({PULSE_MIN_NS}-{PULSE_MAX_NS} ns)")
-    print(f"  representative: {[round(float(pulses[i]),2) for i in top_idx]} ns")
+    print(f"  representative: {[round(float(pulses[i]), 2) for i in top_idx]} ns")
     print(f"Drive freqs     : {n_freq}  ({F_MIN}-{F_MAX} GHz)")
     print(f"Time samples    : {n_t}  (0-{T_MAX_NS} ns)")
-    print(f"Total solves    : {n_pulses} x {n_freq} = {n_pulses*n_freq:,}\n")
+    print(f"Total solves    : {n_pulses} x {n_freq} = {n_pulses * n_freq:,}\n")
 
     # ── run the sweep ────────────────────────────────────────────────────────
     postpulse_map, top_pop_maps, top_phi_maps = run_all(
-        pulses, top_idx, freq_axis, tlist, workers, smoke_test)
+        pulses, top_idx, freq_axis, tlist, workers, smoke_test
+    )
 
     # ── assemble the three tables ────────────────────────────────────────────
     print("\nAssembling tables ...")
     pp_data = assemble_postpulse(pulses, freq_axis, postpulse_map)
     pt_data = assemble_poptraces(pulses, top_idx, freq_axis, tlist, top_pop_maps)
-    pv_data, fft_freq_MHz = assemble_phaseV(pulses, top_idx, freq_axis,
-                                            top_phi_maps, tlist, dt)
+    pv_data, fft_freq_MHz = assemble_phaseV(
+        pulses, top_idx, freq_axis, top_phi_maps, tlist, dt
+    )
 
     tables = {
-        "postpulse_map":     (pp_data, POSTPULSE_COLUMNS),
+        "postpulse_map": (pp_data, POSTPULSE_COLUMNS),
         "population_traces": (pt_data, POPTRACE_COLUMNS),
-        "phaseV_fft":        (pv_data, PHASEV_COLUMNS),
+        "phaseV_fft": (pv_data, PHASEV_COLUMNS),
     }
 
-    metadata = build_metadata(pulses, top_idx, freq_axis, tlist, fft_freq_MHz,
-                              smoke_test)
+    metadata = build_metadata(
+        pulses, top_idx, freq_axis, tlist, fft_freq_MHz, smoke_test
+    )
     column_doc = build_column_info(pulses, top_idx, freq_axis, tlist, fft_freq_MHz)
 
     # ── save pickles + JSON sidecars ─────────────────────────────────────────
@@ -652,12 +755,19 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
     pkl_paths = {}
     for name, (data, cols) in tables.items():
         pkl_path = os.path.join(output_dir, f"experiment_10_{name}.pkl")
-        payload = {"data": data, "columns": cols, "table": name,
-                   "attrs": metadata, "column_doc": column_doc["tables"][name]}
+        payload = {
+            "data": data,
+            "columns": cols,
+            "table": name,
+            "attrs": metadata,
+            "column_doc": column_doc["tables"][name],
+        }
         save_pickle(payload, pkl_path)
         pkl_paths[name] = pkl_path
-        print(f"  {name:18s}: {data.shape}  ->  {pkl_path}  "
-              f"({os.path.getsize(pkl_path)/1024**2:.1f} MB)")
+        print(
+            f"  {name:18s}: {data.shape}  ->  {pkl_path}  "
+            f"({os.path.getsize(pkl_path) / 1024**2:.1f} MB)"
+        )
 
     meta_path = os.path.join(script_dir, "metadata.json")
     cols_path = os.path.join(script_dir, "column_info.json")
@@ -680,8 +790,10 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
     }
     for name, (data, cols) in tables.items():
         if data.shape[0] != expected[name]:
-            errors.append(f"  [FAIL] {name} rows: got {data.shape[0]:,}, "
-                          f"expected {expected[name]:,}")
+            errors.append(
+                f"  [FAIL] {name} rows: got {data.shape[0]:,}, "
+                f"expected {expected[name]:,}"
+            )
         elif int(np.isnan(data).sum()) or int(np.isinf(data).sum()):
             errors.append(f"  [FAIL] {name} contains NaN/Inf")
         else:
@@ -691,23 +803,31 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
     if pop_col.min() < -1e-3:
         errors.append(f"  [FAIL] population negative: {pop_col.min():.4f}")
     else:
-        print(f"  [PASS] population non-negative: "
-              f"[{pop_col.min():.4f}, {pop_col.max():.4f}]")
+        print(
+            f"  [PASS] population non-negative: "
+            f"[{pop_col.min():.4f}, {pop_col.max():.4f}]"
+        )
 
     pp_col = pp_data[:, POSTPULSE_COLUMNS.index("postpulse_population")]
     if pp_col.min() < -1e-3:
         errors.append(f"  [FAIL] postpulse_population negative: {pp_col.min():.4f}")
     else:
-        print(f"  [PASS] postpulse_population non-negative: "
-              f"[{pp_col.min():.4f}, {pp_col.max():.4f}]")
+        print(
+            f"  [PASS] postpulse_population non-negative: "
+            f"[{pp_col.min():.4f}, {pp_col.max():.4f}]"
+        )
 
     pv_col = pv_data[:, PHASEV_COLUMNS.index("normalized_phase_fft")]
     if pv_col.min() < -1e-6 or pv_col.max() > 1.0 + 1e-4:
-        errors.append(f"  [FAIL] normalized_phase_fft outside [0,1]: "
-                      f"[{pv_col.min():.4f}, {pv_col.max():.4f}]")
+        errors.append(
+            f"  [FAIL] normalized_phase_fft outside [0,1]: "
+            f"[{pv_col.min():.4f}, {pv_col.max():.4f}]"
+        )
     else:
-        print(f"  [PASS] normalized_phase_fft in [0,1]: "
-              f"[{pv_col.min():.4f}, {pv_col.max():.4f}]")
+        print(
+            f"  [PASS] normalized_phase_fft in [0,1]: "
+            f"[{pv_col.min():.4f}, {pv_col.max():.4f}]"
+        )
 
     if len(np.unique(pp_data[:, 0])) != n_pulses:
         errors.append("  [FAIL] postpulse_map pulse count mismatch")
@@ -734,8 +854,10 @@ def _build_dataset_impl(output_dir, workers=4, write_csv_file=True, smoke_test=F
         for name, (data, cols) in tables.items():
             csv_path = os.path.join(output_dir, f"experiment_10_{name}.csv")
             write_csv(data, cols, csv_path)
-            print(f"  {name:18s}: {os.path.getsize(csv_path)/1024**2:.1f} MB, "
-                  f"{data.shape[0]:,} rows")
+            print(
+                f"  {name:18s}: {os.path.getsize(csv_path) / 1024**2:.1f} MB, "
+                f"{data.shape[0]:,} rows"
+            )
 
     return pkl_paths
 
@@ -747,14 +869,26 @@ if __name__ == "__main__":
         "tables; N=2 TLS ring-down & phase sharpening, including the uncoupled "
         "quirk)."
     )
-    parser.add_argument("--output_dir", type=str, default=_script_dir,
-                        help="Where to write experiment_10/ (default: next to this script).")
-    parser.add_argument("--workers", type=int, default=4,
-                        help="Parallel solver processes (real run only).")
-    parser.add_argument("--no_csv", action="store_true",
-                        help="Skip the CSVs, write only the pickles.")
-    parser.add_argument("--smoke-test", action="store_true",
-                        help="Tiny grids + synthetic arrays; no qutip required.")
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=_script_dir,
+        help="Where to write experiment_10/ (default: next to this script).",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="Parallel solver processes (real run only).",
+    )
+    parser.add_argument(
+        "--no_csv", action="store_true", help="Skip the CSVs, write only the pickles."
+    )
+    parser.add_argument(
+        "--smoke-test",
+        action="store_true",
+        help="Tiny grids + synthetic arrays; no qutip required.",
+    )
     args = parser.parse_args()
 
     build_dataset(
