@@ -10,6 +10,21 @@
 *.csv
 *.npz
 
+# Exception: the measured (experimental) datasets are checked in via Git LFS
+# under /dataset — experiments 2, 3, 4, 5, 11, 12, 13, 14, the raw BCTDS
+# measurements. Simulated experiments (6, 7, 8, 9, 10, 15, 16) are not checked
+# in; they regenerate deterministically from their creation scripts.
+# Pickle only — the CSVs are equivalent data in a heavier format, so they stay
+# gitignored (still generated locally, just not pushed).
+!/dataset/experiment_2/*.pkl
+!/dataset/experiment_3/*.pkl
+!/dataset/experiment_4/*.pkl
+!/dataset/experiment_5/*.pkl
+!/dataset/experiment_11/*.pkl
+!/dataset/experiment_12/*.pkl
+!/dataset/experiment_13/*.pkl
+!/dataset/experiment_14/*.pkl
+
 # Raw measurement files. These live in the manuscript codebase, not here; this
 # repo holds only the code that reads them.
 *.npy

@@ -24,6 +24,11 @@ for folder in folders:
         continue
     md = open(path, encoding="utf-8").read()
 
+    # TEMPORARY: strip institution attribution lines from the rendered site.
+    # The README source files are untouched; this only affects what gets
+    # embedded into index.html. Remove this filter to restore attribution.
+    md = re.sub(r"(?m)^.*Fitzpatrick Lab, Dartmouth College.*\n?", "", md)
+
     # H1 title
     h1 = ""
     for line in md.splitlines():
@@ -304,6 +309,7 @@ TEMPLATE = r"""<!doctype html>
       <a href="#overview">Overview</a>
       <a href="#experiments">Experiments</a>
       <a href="#access">Access</a>
+      <a href="https://github.com/Dartmouth-RIT/TLS-Data-Paper" target="_blank" rel="noopener">GitHub ↗</a>
       <a href="#experiments" class="nav-cta" style="color:var(--cyan)">Explore ↗</a>
     </div>
   </div>
@@ -399,7 +405,9 @@ df = pd.<span class="c-fn">DataFrame</span>(payload[<span class="c-str">"data"</
       <div><h5>Explore</h5><div class="fl"><a href="#experiments">All 15 experiments</a><a href="#access">Access &amp; code</a></div></div>
     </div>
     <div class="foot-bottom">
+      <!-- TEMPORARY: institution credit hidden for now. Uncomment to restore.
       <span class="credit">Uses code &amp; simulation methods from the Fitzpatrick Lab, Dartmouth College.</span>
+      -->
       <span>QTLS · dark quantum theme</span>
     </div>
   </div>
