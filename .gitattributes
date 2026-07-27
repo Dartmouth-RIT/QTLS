@@ -1,0 +1,8 @@
+/dataset/experiment_12/*.pkl filter=lfs diff=lfs merge=lfs -text
+/dataset/experiment_4/*.pkl filter=lfs diff=lfs merge=lfs -text
+/dataset/experiment_11/*.pkl filter=lfs diff=lfs merge=lfs -text
+/dataset/experiment_5/*.pkl filter=lfs diff=lfs merge=lfs -text
+/dataset/experiment_13/*.pkl filter=lfs diff=lfs merge=lfs -text
+/dataset/experiment_14/*.pkl filter=lfs diff=lfs merge=lfs -text
+/dataset/experiment_2/*.pkl filter=lfs diff=lfs merge=lfs -text
+/dataset/experiment_3/*.pkl filter=lfs diff=lfs merge=lfs -text
