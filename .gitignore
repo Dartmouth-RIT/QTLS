@@ -266,3 +266,4 @@ data/
 # never committed — this keeps the live site always in sync with the current
 # READMEs. Rebuild locally with `python website/build_site.py` to preview.
 website/index.html
+website/dataset_urls.txt
