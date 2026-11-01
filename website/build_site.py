@@ -297,7 +297,7 @@ df = pd.DataFrame(payload["data"], columns=payload["columns"])</pre>
 
   <h2 id="prior-work">Prior work</h2>
   <div class="card">
-    <p>This dataset builds on the following earlier work. The paper describing this dataset has not been published yet; a citation will be added here once it is.</p>
+    <p>This dataset builds on the following earlier work.</p>
     <p class="cite">__CITE_TEXT__</p>
     <p>Code for that paper: <a href="https://github.com/fitz-lab/BCTDS-Coherent-Control-Manuscript-Codebase" target="_blank" rel="noopener">fitz-lab/BCTDS-Coherent-Control-Manuscript-Codebase</a></p>
     <div class="bibhead"><b>BibTeX</b><button class="copy" type="button" id="copy-bib">Copy</button></div>
