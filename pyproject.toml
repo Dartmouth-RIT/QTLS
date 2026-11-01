@@ -8,13 +8,16 @@ version = "0.1.0"
 description = "Scripts that build the BCTDS / TLS spectroscopy datasets from raw files"
 readme = "README.md"
 requires-python = ">=3.10"
-# Needed by every creation script and to load the released .pkl files.
+# Needed by every creation script and to load the released .pkl files,
+# plus flake8 and black for the lint check.
 # numpy 2 is required: the pickles were written with numpy 2 and do not
 # load under numpy 1.x.
 dependencies = [
     "numpy>=2",
     "pandas>=1.5",
     "tqdm>=4.60",
+    "flake8",
+    "black",
 ]
 
 [project.optional-dependencies]
@@ -22,14 +25,6 @@ dependencies = [
 simulation = [
     "scipy>=1.10",
     "qutip>=5.0",
-]
-# Linting and formatting.
-dev = [
-    "flake8",
-    "black",
-]
-all = [
-    "dataset_creation_scripts[simulation,dev]",
 ]
 
 [tool.setuptools.packages.find]

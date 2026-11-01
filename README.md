@@ -128,9 +128,8 @@ See each experiment's README for its exact inputs and options.
 Python 3.10 or newer.
 
 ```bash
-pip install -e .                 # numpy, pandas, tqdm: enough to load the data and run the measured-data scripts
+pip install -e .                 # numpy, pandas, tqdm, flake8, black: enough to load the data and run the measured-data scripts
 pip install -e ".[simulation]"   # adds scipy and qutip for the simulation scripts
-pip install -e ".[all]"          # also adds flake8 and black
 ```
 
 `src/dataset_creation_scripts/requirements.txt` lists the same packages for a
