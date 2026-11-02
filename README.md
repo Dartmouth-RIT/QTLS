@@ -46,14 +46,13 @@ stored I and Q:
   pulse length or amplitude changes, which is why they are read as the defect
   frequencies.
 
-Measured samples:
+Measured samples, as described in the paper:
 
-| Sample | Used in |
-|---|---|
-| Si(111) with native oxide | Exps 2, 3, 4, 14 |
-| Sapphire with 2 nm ALD AlOx | Exps 3, 4 |
-| Silicon with silicon oxide (third sample, 4424 MHz) | Exps 3, 4 (not shown in the paper) |
-| Sapphire with spin-coated Shipley 1813 photoresist | Exps 5, 11, 12, 13 |
+| Sample | Used in | Paper section |
+|---|---|---|
+| Si(111) with native oxide | Exps 2, 3, 4 | Section 3.1, Appendix A.1 |
+| Sapphire with 2 nm ALD AlOx | Exps 3, 4 | Section 3.2, Appendix A.2 |
+| Sapphire with spin-coated Shipley 1813 photoresist | Exps 5, 11, 12, 13 | Appendices B and C |
 
 ---
 
@@ -79,13 +78,13 @@ equation). Each reproduces one measured result qualitatively.
 | # | Experiment | What is swept | What it shows | Data file(s) | Size |
 |---|---|---|---|---|---|
 | 2 | [Pulse-width sweep](src/dataset_creation_scripts/02_pulse_width_sweep/README.md) | Si(111); pulse duration (42 values, ~5–214 ns) × drive frequency (4100–4599 MHz, 1 MHz steps) | Ring-downs sharpen with longer pulses while the V bases stay fixed. Counting them gives a TLS density of about 84 GHz⁻¹. | `experiment_2_dataset_long.pkl` | 420 MB |
-| 3 | [Amplitude control (two-pulse)](src/dataset_creation_scripts/03_amplitude_control/README.md) | 3 samples at one frequency each (3657, 4254, 4424 MHz); first-pulse amplitude (100 values, up to 30,000 a.u.) × spacing (6 values, 0–50 ns); second pulse fixed at ~10,000 a.u. | The ring-down after the second pulse shifts with the first pulse's amplitude: the bath keeps a memory of the first pulse. | `experiment_3_dataset_long.pkl` | 50 MB |
-| 4 | [Phase control (two-pulse)](src/dataset_creation_scripts/04_phase_control/README.md) | Same samples and frequencies as Exp 3; first-pulse phase (0–360°, 3° steps) × spacing (6 values, 0–50 ns); first pulse 3× the second | Phase-dependent interference fringes in every sample. | `experiment_4_dataset_long.pkl` | 61 MB |
+| 3 | [Amplitude control (two-pulse)](src/dataset_creation_scripts/03_amplitude_control/README.md) | AlOx at 3657 MHz and Si(111) at 4254 MHz; first-pulse amplitude (100 values, up to 30,000 a.u.) × spacing (6 values, 0–50 ns); second pulse fixed at ~10,000 a.u. | The ring-down after the second pulse shifts with the first pulse's amplitude: the bath keeps a memory of the first pulse. | `experiment_3_dataset_long.pkl` | 50 MB |
+| 4 | [Phase control (two-pulse)](src/dataset_creation_scripts/04_phase_control/README.md) | Same samples and frequencies as Exp 3; first-pulse phase (0–360°, 3° steps) × spacing (6 values, 0–50 ns); first pulse 3× the second | Phase-dependent interference fringes in both samples. | `experiment_4_dataset_long.pkl` | 61 MB |
 | 5 | [Phase control at long inter-pulse spacing](src/dataset_creation_scripts/05_phase_control_long_spacing/README.md) | Shipley, 3400 MHz; first-pulse phase × spacing (9 values, 10–600 ns) | The single-pulse ring-down lasts ~100 ns. Phase control fades once the spacing is well past that. | `experiment_5_dataset_long.pkl` | 26 MB |
 | 11 | [Temperature dependence during warm-up](src/dataset_creation_scripts/11_temperature_sweep_warmup/README.md) | Shipley; 106 back-to-back single-pulse sweeps (3–5 GHz, 5 MHz steps) during an uncontrolled warm-up from base to ~250 K | Ring-down lifetimes collapse near 1 K and the response vanishes at high temperature, consistent with a quantum origin. | `experiment_11_dataset_long.pkl` | 1.36 GB |
 | 12 | [Phase control at different temperatures](src/dataset_creation_scripts/12_phase_control_temperature/README.md) | Shipley; Exp 5's protocol (phase × 9 spacings) at 3400 and 3560 MHz, at 7 set points (8, 95, 200, 307, 400, 600, 750 mK), each thermalised > 1 h | Interference contrast fades as temperature rises. The jump in lifetime between 95 and 200 mK is attributed to spectral diffusion. | `experiment_12_dataset_long.pkl` | 488 MB |
 | 13 | [Thermal cycle (before and after)](src/dataset_creation_scripts/13_thermal_cycle/README.md) | Shipley at ~22 mK; single-pulse sweep (2000–4999 MHz, 1 MHz steps) in two cooldowns 3 days apart, with a warm-up to room temperature between | The ring-down patterns and V positions change: thermal cycling reconfigures the TLS population. | `experiment_13_dataset_long.pkl` | 120 MB |
-| 14 | [Pulse-amplitude sweep spectroscopy](src/dataset_creation_scripts/14_phase_v_amplitude_sweep/README.md) | Si(111); 200 ns pulse; amplitude (66 values, 0–30,000 a.u.) × 500 drive frequencies. Amplitude 0 is an undriven noise reference. | V bases stay fixed as amplitude grows, and the response saturates. | `figure14_dataset_long.pkl` + 3 small derived files | 1.29 GB |
+| 14 | [Pulse-amplitude sweep spectroscopy](src/dataset_creation_scripts/14_phase_v_amplitude_sweep/README.md) | 200 ns pulse; amplitude (66 values, 0–30,000 a.u.) × 500 drive frequencies. Amplitude 0 is an undriven noise reference. | V bases stay fixed as amplitude grows, and the response saturates. | `figure14_dataset_long.pkl` + 3 small derived files | 1.29 GB |
 
 Total: about 3.8 GB, stored with Git LFS under `dataset/experiment_N/`.
 
@@ -125,13 +124,13 @@ documentation are in the repository.
 
 ### Differences from the paper figures
 
-- **Exps 3 and 4** contain three samples and six spacings (0–50 ns). The paper
-  shows two samples (AlOx and Si(111)) and three spacings (10, 30, 50 ns).
+- **Exps 3 and 4** contain six spacings (0–50 ns). The paper shows three
+  (10, 30, 50 ns).
 - **Exp 5** is byte-for-byte the 8 mK, 3400 MHz slice of Exp 12, so Figure 5
   and the 8 mK row of Figure 12 come from the same acquisition.
 - **Exp 12** has nine spacings and two frequencies at each temperature.
   Figure 12 shows only 3400 MHz at 100 ns.
-- **Exp 11** has 106 sweeps; Figure 11 shows sweeps 0–50. The mixing-chamber
+- **Exp 11** has 106 sweeps and runs to ~250 K; Figure 11 shows sweeps 0–50 (up to ~88 K). The mixing-chamber
   temperature is missing (NaN) for sweeps 83–105.
 - **Exp 13** spans 2000–4999 MHz; Figure 13 shows 3.3–3.8 GHz.
 - Built-in repeats include the 0° and 360° phase pairs (Exps 4, 5, 12),
