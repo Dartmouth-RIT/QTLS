@@ -8,6 +8,7 @@ on:
     paths:
       - "website/**"
       - "src/dataset_creation_scripts/**/README.md"
+      - "dataset/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:        # allow manual runs from the Actions tab
 
