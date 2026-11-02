@@ -260,6 +260,7 @@ archive/
 plots/
 runs/
 data/
+rebuttal_analysis/
 
 # Built website. Regenerated from the experiment READMEs by website/build_site.py
 # (and by the GitHub Actions Pages workflow on every deploy), so the built file is

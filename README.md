@@ -20,26 +20,72 @@ This dataset builds on earlier BCTDS work on the same measurement platform:
 
 Code for that paper: <https://github.com/fitz-lab/BCTDS-Coherent-Control-Manuscript-Codebase>
 
+Experiment numbers follow that paper's figure numbers: Experiment *N*
+corresponds to Figure *N*. Several released experiments cover more settings
+than the corresponding figure shows (see
+[Differences from the figures](#differences-from-the-paper-figures)).
+
+---
+
+## How the measurements work
+
+A sample chip (27.5 × 5.5 mm) sits between two WR-229 waveguide adaptors (3–6
+GHz passband, TE₁₀ mode) on the mixing-chamber stage of a Bluefors LD400
+dilution refrigerator, below 10 mK unless stated. An RFSoC 4×2 board
+synthesises square microwave pulses and performs homodyne readout with the
+local oscillator at the drive frequency. After a pulse switches off, the TLS
+ensemble rings down, and the in-phase (I) and quadrature (Q) signals of that
+ring-down are recorded: 1,000 samples at about 1.81 ns per sample.
+
+Two derived views are used throughout, and both can be computed from the
+stored I and Q:
+
+- **Transient spectrum:** log |I + iQ| against drive frequency and time.
+- **Phase FFT:** the FFT of arg(I + iQ). It shows V-shaped features whose
+  base sits at a bare TLS eigenfrequency. The V bases do not move when the
+  pulse length or amplitude changes, which is why they are read as the defect
+  frequencies.
+
+Measured samples:
+
+| Sample | Used in |
+|---|---|
+| Si(111) with native oxide | Exps 2, 3, 4, 14 |
+| Sapphire with 2 nm ALD AlOx | Exps 3, 4 |
+| Silicon with silicon oxide (third sample, 4424 MHz) | Exps 3, 4 (not shown in the paper) |
+| Sapphire with spin-coated Shipley 1813 photoresist | Exps 5, 11, 12, 13 |
+
 ---
 
 ## Experiments
 
-Each experiment has a folder under `src/dataset_creation_scripts/` with a
-README (full documentation, column descriptions, loading example), the
-creation script, and `metadata.json` / `column_info.json` where applicable.
+The measured experiments fall into three families:
+
+1. **Single-pulse spectroscopy** (Exps 2, 14, 13) locates the TLS defects. One
+   pulse is swept across frequency while one drive setting is varied.
+2. **Two-pulse coherent control** (Exps 3, 4, 5) tests whether the defect
+   bath remembers an earlier pulse. The second pulse never changes, so any
+   change in the ring-down after it comes from the first pulse.
+3. **Temperature and thermal history** (Exps 11, 12, 13) repeat families 1
+   and 2 while the fridge warms up, at fixed raised temperatures, or after a
+   warm-up to room temperature.
+
+The simulations (Exps 6–10, 15, 16) use a driven tunnelling model of N = 2 or
+4 TLS with dipole–dipole coupling J and collective decay (Lindblad master
+equation). Each reproduces one measured result qualitatively.
 
 ### Published in this release
 
-| # | Experiment | Type | Data file(s) | Size |
-|---|---|---|---|---|
-| 2 | [Pulse-width sweep](src/dataset_creation_scripts/02_pulse_width_sweep/README.md) | measured | `experiment_2_dataset_long.pkl` | 420 MB |
-| 3 | [Amplitude control (two-pulse)](src/dataset_creation_scripts/03_amplitude_control/README.md) | measured | `experiment_3_dataset_long.pkl` | 50 MB |
-| 4 | [Phase control (two-pulse)](src/dataset_creation_scripts/04_phase_control/README.md) | measured | `experiment_4_dataset_long.pkl` | 61 MB |
-| 5 | [Phase control at long inter-pulse spacing](src/dataset_creation_scripts/05_phase_control_long_spacing/README.md) | measured | `experiment_5_dataset_long.pkl` | 26 MB |
-| 11 | [Temperature dependence during warm-up](src/dataset_creation_scripts/11_temperature_sweep_warmup/README.md) | measured | `experiment_11_dataset_long.pkl` | 1.36 GB |
-| 12 | [Phase control at different temperatures](src/dataset_creation_scripts/12_phase_control_temperature/README.md) | measured | `experiment_12_dataset_long.pkl` | 488 MB |
-| 13 | [Thermal cycle (before and after)](src/dataset_creation_scripts/13_thermal_cycle/README.md) | measured | `experiment_13_dataset_long.pkl` | 120 MB |
-| 14 | [Pulse-amplitude sweep spectroscopy](src/dataset_creation_scripts/14_phase_v_amplitude_sweep/README.md) | measured | `figure14_dataset_long.pkl` + 3 small derived files | 1.29 GB |
+| # | Experiment | What is swept | What it shows | Data file(s) | Size |
+|---|---|---|---|---|---|
+| 2 | [Pulse-width sweep](src/dataset_creation_scripts/02_pulse_width_sweep/README.md) | Si(111); pulse duration (42 values, ~5–214 ns) × drive frequency (4100–4599 MHz, 1 MHz steps) | Ring-downs sharpen with longer pulses while the V bases stay fixed. Counting them gives a TLS density of about 84 GHz⁻¹. | `experiment_2_dataset_long.pkl` | 420 MB |
+| 3 | [Amplitude control (two-pulse)](src/dataset_creation_scripts/03_amplitude_control/README.md) | 3 samples at one frequency each (3657, 4254, 4424 MHz); first-pulse amplitude (100 values, up to 30,000 a.u.) × spacing (6 values, 0–50 ns); second pulse fixed at ~10,000 a.u. | The ring-down after the second pulse shifts with the first pulse's amplitude: the bath keeps a memory of the first pulse. | `experiment_3_dataset_long.pkl` | 50 MB |
+| 4 | [Phase control (two-pulse)](src/dataset_creation_scripts/04_phase_control/README.md) | Same samples and frequencies as Exp 3; first-pulse phase (0–360°, 3° steps) × spacing (6 values, 0–50 ns); first pulse 3× the second | Phase-dependent interference fringes in every sample. | `experiment_4_dataset_long.pkl` | 61 MB |
+| 5 | [Phase control at long inter-pulse spacing](src/dataset_creation_scripts/05_phase_control_long_spacing/README.md) | Shipley, 3400 MHz; first-pulse phase × spacing (9 values, 10–600 ns) | The single-pulse ring-down lasts ~100 ns. Phase control fades once the spacing is well past that. | `experiment_5_dataset_long.pkl` | 26 MB |
+| 11 | [Temperature dependence during warm-up](src/dataset_creation_scripts/11_temperature_sweep_warmup/README.md) | Shipley; 106 back-to-back single-pulse sweeps (3–5 GHz, 5 MHz steps) during an uncontrolled warm-up from base to ~250 K | Ring-down lifetimes collapse near 1 K and the response vanishes at high temperature, consistent with a quantum origin. | `experiment_11_dataset_long.pkl` | 1.36 GB |
+| 12 | [Phase control at different temperatures](src/dataset_creation_scripts/12_phase_control_temperature/README.md) | Shipley; Exp 5's protocol (phase × 9 spacings) at 3400 and 3560 MHz, at 7 set points (8, 95, 200, 307, 400, 600, 750 mK), each thermalised > 1 h | Interference contrast fades as temperature rises. The jump in lifetime between 95 and 200 mK is attributed to spectral diffusion. | `experiment_12_dataset_long.pkl` | 488 MB |
+| 13 | [Thermal cycle (before and after)](src/dataset_creation_scripts/13_thermal_cycle/README.md) | Shipley at ~22 mK; single-pulse sweep (2000–4999 MHz, 1 MHz steps) in two cooldowns 3 days apart, with a warm-up to room temperature between | The ring-down patterns and V positions change: thermal cycling reconfigures the TLS population. | `experiment_13_dataset_long.pkl` | 120 MB |
+| 14 | [Pulse-amplitude sweep spectroscopy](src/dataset_creation_scripts/14_phase_v_amplitude_sweep/README.md) | Si(111); 200 ns pulse; amplitude (66 values, 0–30,000 a.u.) × 500 drive frequencies. Amplitude 0 is an undriven noise reference. | V bases stay fixed as amplitude grows, and the response saturates. | `figure14_dataset_long.pkl` + 3 small derived files | 1.29 GB |
 
 Total: about 3.8 GB, stored with Git LFS under `dataset/experiment_N/`.
 
@@ -48,14 +94,48 @@ Total: about 3.8 GB, stored with Git LFS under `dataset/experiment_N/`.
 The simulated results are not released yet. Their creation scripts and
 documentation are in the repository.
 
-| # | Experiment |
-|---|---|
-| 6 | [Floquet spectroscopy of a two-TLS system](src/dataset_creation_scripts/06_floquet/README.md) |
-| 8 | [Amplitude and multi-pulse control (N = 4)](src/dataset_creation_scripts/08_amplitude_control/README.md) |
-| 9 | [Separation and relative-phase control (N = 2)](src/dataset_creation_scripts/09_separation_phase_sweep/README.md) |
-| 10 | [Ring-down and phase sharpening vs pulse duration](src/dataset_creation_scripts/10_sharpening_physics/README.md) |
-| 15 | [Interaction strength characterization](src/dataset_creation_scripts/15_j_ij_characterization/README.md) |
-| 16 | [Degenerate and non-degenerate TLS dynamics](src/dataset_creation_scripts/16_tls_braiding/README.md) |
+| # | Experiment | Model | Reproduces |
+|---|---|---|---|
+| 6 | [Floquet spectroscopy of a two-TLS system](src/dataset_creation_scripts/06_floquet/README.md) | N = 2, master equation and Floquet quasi-energies | V features of Exp 2; V bases line up with quasi-energy dips |
+| 7 | [Analytical phase-V spectroscopy](src/dataset_creation_scripts/07_perturbation_theory_spectra/README.md) | Two TLS, second-order perturbation theory | V bases at the bare frequencies, plus weaker sideband lines (Exp 2) |
+| 8 | [Amplitude and multi-pulse control (N = 4)](src/dataset_creation_scripts/08_amplitude_control/README.md) | N = 4, amplitude sweep and two-pulse protocol | Exp 3 |
+| 9 | [Separation and relative-phase control (N = 2)](src/dataset_creation_scripts/09_separation_phase_sweep/README.md) | N = 2, sweeps of the gap between pulses and their relative phase | Exps 4 and 5 |
+| 10 | [Ring-down and phase sharpening vs pulse duration](src/dataset_creation_scripts/10_sharpening_physics/README.md) | N = 2 at 4.0 and 4.1 GHz, pulse duration swept | Sharpening with pulse length in Exp 2 |
+| 15 | [Interaction strength characterization](src/dataset_creation_scripts/15_j_ij_characterization/README.md) | N = 4, coupling J from 5 MHz to 0.5 GHz | Why strongly coupled clusters can show a single V |
+| 16 | [Degenerate and non-degenerate TLS dynamics](src/dataset_creation_scripts/16_tls_braiding/README.md) | N = 2, detuned vs identical frequencies | Braided vs single-line ring-downs in Exp 2 |
+
+### How the experiments connect
+
+- **Exps 2 and 14** vary the two single-pulse drive settings: duration and
+  amplitude. The V bases stay fixed under both, which identifies them as the
+  bare TLS frequencies.
+- **Exp 13** is the check on that result. A thermal cycle does move the V
+  features, so they follow the actual defects rather than the waveguide or
+  electronics.
+- **Exp 2 leads to Exps 3–5.** Pulse length changes how sidebands interfere,
+  which suggests that pulse shape can steer the response. Exps 3–5 test this
+  with two pulses, turning one setting at a time: first-pulse amplitude (3),
+  first-pulse phase (4), then the spacing out to 600 ns to measure how long
+  the memory lasts (5). Each sample's drive frequency was picked from its
+  broadband single-pulse map, at a long ring-down.
+- **Exps 11 and 12** add temperature. Exp 11 does single-pulse spectroscopy
+  while the fridge warms. Exp 12 repeats Exp 5's phase-control protocol at
+  fixed temperatures. Both lose coherent features above roughly the
+  kT = hf crossover (144 mK at 3 GHz, 240 mK at 5 GHz).
+
+### Differences from the paper figures
+
+- **Exps 3 and 4** contain three samples and six spacings (0–50 ns). The paper
+  shows two samples (AlOx and Si(111)) and three spacings (10, 30, 50 ns).
+- **Exp 5** is byte-for-byte the 8 mK, 3400 MHz slice of Exp 12, so Figure 5
+  and the 8 mK row of Figure 12 come from the same acquisition.
+- **Exp 12** has nine spacings and two frequencies at each temperature.
+  Figure 12 shows only 3400 MHz at 100 ns.
+- **Exp 11** has 106 sweeps; Figure 11 shows sweeps 0–50. The mixing-chamber
+  temperature is missing (NaN) for sweeps 83–105.
+- **Exp 13** spans 2000–4999 MHz; Figure 13 shows 3.3–3.8 GHz.
+- Built-in repeats include the 0° and 360° phase pairs (Exps 4, 5, 12),
+  first-pulse amplitude 0 (Exp 3) and amplitude 0 (Exp 14).
 
 ---
 
@@ -128,6 +208,7 @@ See each experiment's README for its exact inputs and options.
 Python 3.10 or newer.
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate   # create and activate a virtual environment (Windows: .venv\Scripts\activate)
 pip install -e .                 # numpy, pandas, tqdm, flake8, black: enough to load the data and run the measured-data scripts
 pip install -e ".[simulation]"   # adds scipy and qutip for the simulation scripts
 ```
