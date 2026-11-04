@@ -10,6 +10,7 @@ size, a download button for every data file, and its full documentation.
 |---|---|
 | Experiment list, titles, descriptions, documentation | `../src/dataset_creation_scripts/NN_*/README.md` |
 | Data files and sizes | `../dataset/experiment_N/*` (Git LFS) |
+| "Data at a glance" figures | `figures/*.png` (committed; captions are in `FIGURES` in `build_site.py`) |
 
 To publish data for a new experiment, add its files under
 `dataset/experiment_N/` (tracked with Git LFS). The page picks them up on the
@@ -20,6 +21,7 @@ next build.
 | File | Purpose |
 |---|---|
 | `build_site.py` | Generates `index.html` and `dataset_urls.txt` |
+| `figures/` | Overview figures shown on the page, copied from the analysis outputs. Missing files are skipped |
 | `index.html` | The built page (generated, not committed) |
 | `dataset_urls.txt` | Plain list of every data-file URL, for bulk download (generated, not committed) |
 
