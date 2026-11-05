@@ -2,7 +2,8 @@
 """Build the QTLS dataset page (website/index.html).
 
 A simple, light "catalog" page: one row per experiment with its type, total
-size, per-file download links and its full README documentation.
+size, per-file download links and its full README documentation, plus a
+"Data at a glance" gallery of the overview figures in website/figures/.
 
 * Experiment docs come from ../src/dataset_creation_scripts/NN_*/README.md
 * Data files come from ../dataset/experiment_N/  (stored with Git LFS)
@@ -48,6 +49,11 @@ PRIOR_WORK_BIBTEX = """@article{wang2025spectroscopy,
   year={2025},
   publisher={IOP Publishing}
 }"""
+# Rows (records) per released experiment: traces x 1,000 samples each. Kept here
+# because CI checks out LFS pointers only and cannot count rows in the pickles.
+# Update when an experiment's data changes.
+RECORDS = {2: 21_000_000, 3: 1_800_000, 4: 2_178_000, 5: 1_089_000,
+           11: 42_506_000, 12: 15_246_000, 13: 6_000_000, 14: 33_000_000}
 SIMS = {6, 7, 8, 9, 10, 15, 16}  # simulation experiments; the rest are measured
 
 esc = html.escape
@@ -70,6 +76,17 @@ def human(n):
         if n < 1024 or unit == "GB":
             return f"{n:.0f} {unit}" if unit in ("B", "KB") else f"{n:.1f} {unit}"
         n /= 1024
+
+
+def records(n):
+    return f"{n / 1e6:.1f}M"
+
+
+def amount(num, size):
+    """'21.0M records (400.5 MB)' style label; size only when the count is unknown."""
+    if num in RECORDS:
+        return f"{records(RECORDS[num])} ({human(size)})"
+    return human(size)
 
 
 def clean_title(h1):
@@ -145,11 +162,12 @@ for folder in sorted(os.listdir(DOCS)):
 
 all_files = [f for e in experiments for f in e["files"]]
 total = sum(s for _, s in all_files)
+total_records = sum(RECORDS.get(e["num"], 0) for e in experiments if e["files"])
 
 
 def row_html(e):
     kind = "Simulated" if e["kind"] == "sim" else "Measured"
-    size = human(sum(s for _, s in e["files"])) if e["files"] else "—"
+    size = amount(e["num"], sum(s for _, s in e["files"])) if e["files"] else "—"
     if e["files"]:
         dl = "".join(
             f'<a class="btn" href="{MEDIA_URL}{p}" download>'
@@ -177,6 +195,102 @@ readmes = {
 }
 readmes_json = json.dumps(readmes).replace("</", "<\\/")
 
+# ---- figures ---------------------------------------------------------------
+# Static PNGs in website/figures/, made by the analysis scripts. A figure whose
+# file is missing is skipped, so the page still builds without them.
+FIGURES = [
+    {
+        "src": "experiment-overview.png",
+        "title": "What each experiment sweeps",
+        "shows": "Each row is one measured experiment. The grid gives the number of distinct values of each "
+        "control setting (a dot means the setting is held fixed); the bars give the number of ring-down "
+        "traces, each 1,000 records long.",
+        "takeaways": [
+            "Drive frequency is the most densely sampled setting (up to 3,000 tones); each experiment adds "
+            "one to three other settings on top of it.",
+            "Settings are swept on grids within an experiment, not across all experiments, so most "
+            "combinations (for example amplitude and temperature together) are not measured.",
+            "Experiment 5 is the 8 mK, 3400 MHz slice of Experiment 12, so use one or the other. The "
+            "mixing-chamber thermometer column in Experiment 11 is empty for sweeps 83–105; I and Q are "
+            "always present.",
+        ],
+    },
+    {
+        "src": "frequency-coverage.png",
+        "title": "Drive frequencies",
+        "shows": "The drive tones used in each experiment, coloured by sample. Bars are frequency sweeps; "
+        "diamonds are a few fixed tones.",
+        "takeaways": [
+            "Together the experiments cover 2–5 GHz. Experiment 13 spans the whole range in 1 MHz steps and "
+            "Experiment 11 covers 3–5 GHz.",
+            "The Shipley 1813 sample has the broadest frequency coverage. Experiments 3 and 4 are the only "
+            "places where several samples are measured under the same protocol.",
+            "Neighbouring tones behave alike, so a model tested on held-out frequency bands gives a more "
+            "honest score than one tested on randomly held-out traces.",
+        ],
+    },
+    {
+        "src": "signal-coverage.png",
+        "title": "Where the signal is",
+        "shows": "Ring-down signal-to-noise ratio (SNR) for every trace across four sweep grids: light is "
+        "noise only (SNR ≈ 1.25), dark is strong signal. SNR is the mean ring-down amplitude 36–72 ns "
+        "after the drive pulse ends, divided by the trace's noise level.",
+        "takeaways": [
+            "Vertical dark bands mark frequencies where the defects respond strongly, for example around "
+            "4.3 GHz in Experiments 2 and 14.",
+            "Experiment 2 has usable signal in every trace. In Experiment 14 the signal only rises above "
+            "noise at higher drive amplitude, so the low-amplitude rows are close to noise.",
+            "In the Experiment 11 warm-up the signal disappears as the sample heats: from sweep 8 onward the "
+            "median trace is noise. Those traces are useful as noise examples or for detection tasks, but "
+            "not for learning the ring-down shape.",
+            "Experiment 13 has strong signal above about 2.5 GHz and weaker signal below it, in both "
+            "cooldowns.",
+        ],
+    },
+    {
+        "src": "noise-and-snr.png",
+        "title": "Noise floor and signal-to-noise",
+        "shows": "(A) The readout noise of undriven traces. (B) The noise level of every trace, taken from its "
+        "last 150 samples after the ring-down has decayed. (C) The share of traces below a given SNR, per "
+        "experiment.",
+        "takeaways": [
+            "Readout noise is Gaussian with σ ≈ 0.098 ADC units in both I and Q, so a simple Gaussian "
+            "noise model is appropriate.",
+            "The noise floor differs between experiments by up to about 7× (about 0.1 for Experiments 2–4 "
+            "and 14, up to 0.7 for Experiment 11). Normalise or weight per experiment before pooling them.",
+            "Most traces are far above noise (median SNR 60–2,500). The exceptions are Experiment 11, where "
+            "95% of traces have SNR below 3, and the low-amplitude part of Experiment 14.",
+        ],
+    },
+]
+figures = [f for f in FIGURES if os.path.exists(os.path.join(HERE, "figures", f["src"]))]
+
+
+def fig_html(i, f):
+    tk = "".join(f"<li>{esc(t)}</li>" for t in f["takeaways"])
+    return f"""<figure class="fig">
+  <button class="figbtn" type="button" data-fig="{i}" aria-label="Enlarge: {esc(f['title'])}"><img src="figures/{f['src']}" alt="{esc(f['title'])}" loading="lazy"></button>
+  <figcaption>
+    <h3>{esc(f['title'])}</h3>
+    <p><b>What it shows.</b> {esc(f['shows'])}</p>
+    <p class="tkh"><b>What to take from it</b></p>
+    <ul>{tk}</ul>
+  </figcaption>
+</figure>"""
+
+
+if figures:
+    figs_html = (
+        '<h2 id="overview">Data at a glance</h2>\n'
+        '  <p class="sub">Click a figure to enlarge it.</p>\n'
+        '  <div class="figs">\n' + "\n".join(fig_html(i, f) for i, f in enumerate(figures)) + "\n  </div>"
+    )
+else:
+    figs_html = ""
+figs_json = json.dumps(
+    [{"src": "figures/" + f["src"], "title": f["title"], "shows": f["shows"], "takeaways": f["takeaways"]} for f in figures]
+).replace("</", "<\\/")
+
 TEMPLATE = r"""<!doctype html>
 <html lang="en">
 <head>
@@ -195,6 +309,7 @@ h1{font-size:28px;line-height:1.2;margin:0 0 8px;letter-spacing:-.01em}
 .lead{color:#5b6476;margin:0 0 20px}
 .stats{display:flex;flex-wrap:wrap;gap:32px;color:#5b6476;font-size:13px}
 .stats b{display:block;font-size:22px;color:#1d2433}
+.stats small{font-size:15px;font-weight:500;color:#5b6476}
 .top{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .pbtn,.gbtn{padding:9px 14px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px}
 .pbtn{background:#2563eb;color:#fff}.pbtn:hover{background:#1d4ed8}
@@ -203,7 +318,7 @@ main{padding:28px 0 8px}
 h2{font-size:19px;margin:28px 0 12px}
 .row{background:#fff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:8px}
 .row[open]{border-color:#c7d2fe}
-summary{display:grid;grid-template-columns:36px 1fr auto 76px;gap:12px;align-items:center;padding:14px 16px;cursor:pointer;list-style:none}
+summary{display:grid;grid-template-columns:36px 1fr auto 140px;gap:12px;align-items:center;padding:14px 16px;cursor:pointer;list-style:none}
 summary::-webkit-details-marker{display:none}
 summary:hover .t{color:#2563eb}
 .n{color:#9aa3b2;font-variant-numeric:tabular-nums}
@@ -228,6 +343,28 @@ pre{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:14px;overflow:aut
 .copy:hover{border-color:#9ca3af}
 pre#bibtex{white-space:pre-wrap;word-break:break-word}
 footer{color:#9aa3b2;font-size:13px;padding:28px 0 40px}
+.sub{color:#5b6476;margin:-6px 0 12px;font-size:13px}
+.figs{display:flex;flex-direction:column;gap:14px}
+.fig{margin:0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px}
+.figbtn{display:block;width:100%;border:0;padding:0;background:#fff;cursor:zoom-in;border-radius:6px;overflow:hidden}
+.figbtn img{display:block;width:100%;max-height:520px;object-fit:contain}
+.figbtn:hover img{opacity:.85}
+.fig figcaption{font-size:14px;color:#4b5563;margin-top:12px;line-height:1.55}
+.fig h3{font-size:16px;color:#1d2433;margin:0 0 6px}
+.fig figcaption p{margin:0 0 8px}
+.fig figcaption b{color:#1d2433}
+.fig ul,.about ul{margin:0;padding-left:20px}.fig li,.about li{margin-bottom:4px}
+.tkh{margin-bottom:4px!important}
+.about h3{font-size:15px;color:#1d2433;margin:16px 0 6px}
+.about h3:first-child{margin-top:0}
+.lb{position:fixed;inset:0;display:none;z-index:11}
+.lb.open{display:block}
+.lbp{position:absolute;inset:4vh 4vw;background:#fff;border-radius:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.lbimg{flex:1;min-height:0;overflow:auto;padding:12px 20px;display:flex;align-items:flex-start;justify-content:center}
+.lbimg img{max-width:100%;height:auto}
+.lbcap p{margin:0 0 6px}.lbcap ul{margin:0;padding-left:20px}
+.lbcap{padding:12px 20px 18px;max-height:30vh;overflow:auto;border-top:1px solid #e5e7eb;color:#4b5563;font-size:14px}
+.lbnav{display:flex;gap:8px}
 /* reader */
 .reader{position:fixed;inset:0;display:none;z-index:10}
 .reader.open{display:block}
@@ -245,6 +382,7 @@ footer{color:#9aa3b2;font-size:13px;padding:28px 0 40px}
 code{background:#f3f4f6;border-radius:4px;padding:1px 5px;font-size:.9em}
 pre code{background:none;padding:0}
 @media (max-width:640px){
+  .lbp{inset:0;border-radius:0}
   summary{grid-template-columns:28px 1fr auto;}
   summary .s{display:none}
   .body{padding:0 16px 16px}
@@ -260,7 +398,7 @@ pre code{background:none;padding:0}
     <div class="stats">
       <span><b>__NEXP__</b>experiments</span>
       <span><b>__NDATA__</b>with downloadable data</span>
-      <span><b>__TOTAL__</b>total data</span>
+      <span><b>__NREC__ <small>(__TOTAL__)</small></b>records</span>
     </div>
     <div class="top">
       <a class="pbtn" href="#download-all">↓ Download everything</a>
@@ -271,12 +409,34 @@ pre code{background:none;padding:0}
 </header>
 
 <main class="w">
+  <h2 id="about">About the data</h2>
+  <div class="card about">
+    <p>Two-level-system (TLS) defects in the amorphous oxides and polymers on superconducting-circuit materials are a leading source of energy loss and decoherence in superconducting qubits. This dataset records how ensembles of these defects respond to pulsed microwave control. In each measurement a dielectric sample sits in a broadband 3D waveguide at millikelvin temperature and is driven by one or two microwave pulses. The microwave signal the excited defects re-emit as they relax afterwards (the <i>ring-down</i>) is recorded as raw homodyne I and Q samples.</p>
+    <h3>What is in a record</h3>
+    <p>Each record (one row) is a single time sample of one ring-down: the control settings, the time since the start of the trace (1.81 ns spacing) and the raw I and Q values. 1,000 consecutive records with the same settings form one ring-down trace. Across the measured experiments the swept settings are drive frequency (2–5 GHz), pulse width, drive amplitude, the relative phase and spacing of two pulses, and temperature (8 mK to about 250 K during a warm-up). Samples include Si(111) with native oxide, sapphire with ALD AlO<sub>x</sub>, and sapphire with Shipley 1813 photoresist. The data is released exactly as measured, without filtering or post-processing. The simulated and analytical experiments (6–10, 15 and 16) are documented with their generation code, but their data has not been published yet.</p>
+    <h3>How it can be used</h3>
+    <ul>
+      <li><b>Learning the control-to-response map.</b> Train models that predict a ring-down from the drive settings, as fast surrogates for pulse design and optimal control.</li>
+      <li><b>Testing physics models and simulators.</b> Compare TLS-ensemble or Bloch-equation simulations with raw measurements, including two-pulse phase and spacing effects and the temperature dependence.</li>
+      <li><b>Spectroscopy and material comparison.</b> Find the frequency bands where defects respond strongly and compare dielectric samples.</li>
+      <li><b>Signal-processing benchmarks.</b> Denoising, detecting weak signals and tracking drift, using traces that range from very strong signal to pure noise.</li>
+    </ul>
+    <h3>Before you start</h3>
+    <ul>
+      <li>Hold out whole frequency bands (or samples, or temperatures) for testing, not random traces. Neighbouring tones are strongly correlated, so random splits overstate accuracy (in one simple baseline, R² fell from 0.94 to 0.82).</li>
+      <li>Noise levels differ between experiments by up to about 7×, so normalise per experiment before pooling them.</li>
+      <li>Experiment 5 duplicates part of Experiment 12, and most of the Experiment 11 warm-up is noise-dominated. The figures below show where the signal is.</li>
+    </ul>
+  </div>
+
+  __FIGS__
+
   <h2>Experiments</h2>
   __ROWS__
 
   <h2 id="download-all">Download everything</h2>
   <div class="card">
-    <p>The full release is __TOTAL__, which is too large for a single zip. Choose one of these:</p>
+    <p>The full release is __NREC__ records (__TOTAL__), which is too large for a single zip. Choose one of these:</p>
     <p><b>Clone the repository with Git LFS</b> (includes the code and documentation):</p>
 <pre>git lfs install
 git clone __REPO__.git</pre>
@@ -315,6 +475,16 @@ df = pd.DataFrame(payload["data"], columns=payload["columns"])</pre>
   </div>
 </div>
 
+<div class="lb" id="lb" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="lb-title">
+  <div class="rb" data-lbclose></div>
+  <div class="lbp">
+    <div class="rh"><b id="lb-title"></b><span class="lbnav"><button class="rx" type="button" id="lb-prev" aria-label="Previous figure">←</button><button class="rx" type="button" id="lb-next" aria-label="Next figure">→</button><a class="rx" id="lb-open" href="#" target="_blank" rel="noopener" style="text-decoration:none;color:inherit">Full size</a><button class="rx" type="button" data-lbclose aria-label="Close">Close ✕</button></span></div>
+    <div class="lbimg"><img id="lb-img" alt=""></div>
+    <div class="lbcap" id="lb-cap"></div>
+  </div>
+</div>
+
+<script id="figs" type="application/json">__FIGS_JSON__</script>
 <script id="readmes" type="application/json">__READMES__</script>
 <script>
 (function(){
@@ -378,6 +548,24 @@ df = pd.DataFrame(payload["data"], columns=payload["columns"])</pre>
   document.querySelectorAll('.doc').forEach(function(b){b.addEventListener('click',function(){open(b.getAttribute('data-exp'));});});
   reader.querySelectorAll('[data-close]').forEach(function(x){x.addEventListener('click',close);});
   document.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&reader.classList.contains('open'))close();});
+  /* ---- figure lightbox ---- */
+  var FIGS=JSON.parse(document.getElementById('figs').textContent),lb=document.getElementById('lb'),cur=0,lbLast=null;
+  function showFig(i){
+    cur=(i+FIGS.length)%FIGS.length;var f=FIGS[cur];
+    document.getElementById('lb-img').src=f.src;document.getElementById('lb-img').alt=f.title;
+    document.getElementById('lb-title').textContent=f.title;var cap=document.getElementById('lb-cap');cap.innerHTML='';var p=document.createElement('p');p.textContent=f.shows;cap.appendChild(p);var ul=document.createElement('ul');f.takeaways.forEach(function(t){var li=document.createElement('li');li.textContent=t;ul.appendChild(li);});cap.appendChild(ul);
+    document.getElementById('lb-open').href=f.src;
+  }
+  function openFig(i){showFig(i);lbLast=document.activeElement;lb.classList.add('open');lb.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';lb.querySelector('[data-lbclose].rx').focus();}
+  function closeFig(){lb.classList.remove('open');lb.setAttribute('aria-hidden','true');document.body.style.overflow='';if(lbLast)lbLast.focus();}
+  document.querySelectorAll('.figbtn').forEach(function(b){b.addEventListener('click',function(){openFig(+b.getAttribute('data-fig'));});});
+  lb.querySelectorAll('[data-lbclose]').forEach(function(x){x.addEventListener('click',closeFig);});
+  document.getElementById('lb-prev').addEventListener('click',function(){showFig(cur-1);});
+  document.getElementById('lb-next').addEventListener('click',function(){showFig(cur+1);});
+  document.addEventListener('keydown',function(ev){
+    if(!lb.classList.contains('open'))return;
+    if(ev.key==='Escape')closeFig();else if(ev.key==='ArrowLeft')showFig(cur-1);else if(ev.key==='ArrowRight')showFig(cur+1);
+  });
   var cb=document.getElementById('copy-bib');
   cb.addEventListener('click',function(){
     var t=document.getElementById('bibtex').textContent;
@@ -394,13 +582,16 @@ df = pd.DataFrame(payload["data"], columns=payload["columns"])</pre>
 """
 
 page = (
-    TEMPLATE.replace("__ROWS__", rows_html)
+    TEMPLATE.replace("__FIGS_JSON__", figs_json)
+    .replace("__FIGS__", figs_html)
+    .replace("__ROWS__", rows_html)
     .replace("__READMES__", readmes_json)
     .replace("__URLS__", esc(url_list))
     .replace("__CITE_TEXT__", esc(PRIOR_WORK_TEXT))
     .replace("__PRIOR_WORK_BIBTEX__", esc(PRIOR_WORK_BIBTEX))
     .replace("__NEXP__", str(len(experiments)))
     .replace("__NDATA__", str(sum(1 for e in experiments if e["files"])))
+    .replace("__NREC__", records(total_records))
     .replace("__TOTAL__", human(total))
     .replace("__REPO_NAME__", esc(REPO))
     .replace("__REPO__", REPO_URL)
@@ -411,5 +602,5 @@ with open(OUT, "w", encoding="utf-8") as fh:
 with open(os.path.join(HERE, "dataset_urls.txt"), "w", encoding="utf-8") as fh:
     fh.write(url_list + "\n")
 print(
-    f"wrote {OUT} - {len(experiments)} experiments, {len(all_files)} data files ({human(total)})"
+    f"wrote {OUT} - {len(experiments)} experiments, {len(all_files)} data files ({human(total)}), {len(figures)} figures"
 )
